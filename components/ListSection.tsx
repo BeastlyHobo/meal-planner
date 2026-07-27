@@ -9,17 +9,24 @@ import {
   ShoppingUsageByKey,
 } from "@/lib/domain/shoppingUsage";
 import { sectionLabelMutedClass } from "@/lib/uiClasses";
-import { stripTraderJoesForDisplay } from "@/lib/displayFormatters";
+import { stripStoreBrandForDisplay } from "@/lib/displayFormatters";
 import { useListMutations } from "@/lib/hooks/useListMutations";
 import { useOfflineChecklist } from "@/lib/hooks/useOfflineChecklist";
-import { JUNK_CATEGORY_ORDER, STORE_CATEGORY_ORDER } from "@/lib/constants";
+import { JUNK_CATEGORY_ORDER } from "@/lib/constants";
+import type { StoreKey } from "@/lib/types";
 
-function listItemKey(category: string, itemName: string) {
-  return `${category}::${itemName}`;
+/** Aisle names repeat across stores, so local UI state is keyed by store too. */
+function listItemKey(store: StoreKey | undefined, category: string, itemName: string) {
+  return `${store ?? ""}::${category}::${itemName}`;
+}
+
+function sectionKey(category: ListCategory) {
+  return `${category.store ?? ""}::${category.category}`;
 }
 
 export default function ListSection({
   data,
+  checklistSeedData,
   colorClass = "bg-harvest-green",
   editable = false,
   weekRange,
@@ -29,6 +36,13 @@ export default function ListSection({
   onUpdate
 }: {
   data: ListCategory[];
+  /**
+   * Sections to seed checked/pantry state from, when that is broader than what is
+   * rendered. The Shop screen renders one store at a time but must seed from the whole
+   * week — otherwise opening one store's tab writes a local snapshot that is missing the
+   * other store's checked items, and switching tabs appears to un-check them.
+   */
+  checklistSeedData?: ListCategory[];
   colorClass?: string;
   editable?: boolean;
   weekRange?: string;
@@ -38,13 +52,10 @@ export default function ListSection({
   onUpdate?: () => void | Promise<void>;
 }) {
   const displayData = useMemo(() => {
+    // Shopping lists arrive already in each store's walking order from
+    // organizeShoppingListForStoreLayout, so preserve the order we were given.
     if (type === "shopping") {
-      const order = new Map(STORE_CATEGORY_ORDER.map((category, index) => [category, index]));
-      return [...data].sort((a, b) => {
-        const aIndex = order.get(a.category as typeof STORE_CATEGORY_ORDER[number]) ?? Number.MAX_SAFE_INTEGER;
-        const bIndex = order.get(b.category as typeof STORE_CATEGORY_ORDER[number]) ?? Number.MAX_SAFE_INTEGER;
-        return aIndex - bIndex;
-      });
+      return data;
     }
 
     if (!editable) {
@@ -62,24 +73,25 @@ export default function ListSection({
     return [...defaults, ...customCategories];
   }, [data, editable, type]);
   
+  const seedData = checklistSeedData ?? displayData;
   const initialPantryItems = useMemo(
     () =>
-      displayData.flatMap((category) =>
+      seedData.flatMap((category) =>
         category.items
           .filter((item) => item.pantry)
-          .map((item) => listItemKey(category.category, item.n))
+          .map((item) => listItemKey(category.store, category.category, item.n))
       ),
-    [displayData]
+    [seedData]
   );
   const [pantryItems, setPantryItems] = useState<string[]>(initialPantryItems);
   const initialCheckedItems = useMemo(
     () =>
-      displayData.flatMap((category) =>
+      seedData.flatMap((category) =>
         category.items
           .filter((item) => item.checked)
-          .map((item) => listItemKey(category.category, item.n))
+          .map((item) => listItemKey(category.store, category.category, item.n))
       ),
-    [displayData]
+    [seedData]
   );
   const {
     isChecked,
@@ -94,6 +106,7 @@ export default function ListSection({
   });
   const [hideChecked, setHideChecked] = useState(false);
   const [recentlyDeleted, setRecentlyDeleted] = useState<{
+    store?: StoreKey;
     category: string;
     name: string;
     q?: string;
@@ -121,7 +134,10 @@ export default function ListSection({
     () =>
       displayData.reduce(
         (sum, category) =>
-          sum + category.items.filter((item) => isChecked(category.category, item.n)).length,
+          sum +
+          category.items.filter((item) =>
+            isChecked(category.store, category.category, item.n)
+          ).length,
         0
       ),
     [displayData, isChecked]
@@ -132,7 +148,7 @@ export default function ListSection({
         (sum, category) =>
           sum +
           category.items.filter((item) =>
-            pantryItems.includes(listItemKey(category.category, item.n))
+            pantryItems.includes(listItemKey(category.store, category.category, item.n))
           ).length,
         0
       ),
@@ -157,14 +173,19 @@ export default function ListSection({
     return () => clearTimeout(timer);
   }, [recentlyDeleted]);
 
-  const toggle = (category: string, itemName: string) => {
-    toggleChecklist(category, itemName);
+  const toggle = (store: StoreKey | undefined, category: string, itemName: string) => {
+    toggleChecklist(store, category, itemName);
   };
 
-  const togglePantry = async (category: string, itemName: string) => {
-    const key = listItemKey(category, itemName);
+  const togglePantry = async (
+    store: StoreKey | undefined,
+    category: string,
+    itemName: string
+  ) => {
+    const key = listItemKey(store, category, itemName);
     const newPantryStatus = !pantryItems.includes(key);
     await savePantryToggle({
+      store,
       category,
       itemName,
       pantry: newPantryStatus,
@@ -179,9 +200,14 @@ export default function ListSection({
     });
   };
 
-  const deleteItem = async (category: string, itemName: string, q?: string) => {
-    await saveDeleteItem(category, itemName);
-    setRecentlyDeleted({ category, name: itemName, q });
+  const deleteItem = async (
+    store: StoreKey | undefined,
+    category: string,
+    itemName: string,
+    q?: string
+  ) => {
+    await saveDeleteItem(category, itemName, store);
+    setRecentlyDeleted({ store, category, name: itemName, q });
   };
 
   const undoDelete = async () => {
@@ -189,15 +215,21 @@ export default function ListSection({
     const restored = await saveAddItem(
       recentlyDeleted.category,
       recentlyDeleted.name,
-      recentlyDeleted.q
+      recentlyDeleted.q,
+      recentlyDeleted.store
     );
     if (restored) {
       setRecentlyDeleted(null);
     }
   };
 
-  const addItem = async (category: string) => {
-    const saved = await saveAddItem(category, newItemName);
+  const addItem = async (category: ListCategory) => {
+    const saved = await saveAddItem(
+      category.category,
+      newItemName,
+      undefined,
+      category.store
+    );
     if (saved) {
       setNewItemName("");
       setAddingCategory(null);
@@ -275,7 +307,9 @@ export default function ListSection({
       {displayData.map((category) => {
         const visibleItems =
           type === "shopping" && hideChecked
-            ? category.items.filter((item) => !isChecked(category.category, item.n))
+            ? category.items.filter(
+                (item) => !isChecked(category.store, category.category, item.n)
+              )
             : category.items;
 
         if (visibleItems.length === 0 && (!editable || (type === "shopping" && hideChecked))) {
@@ -283,22 +317,25 @@ export default function ListSection({
         }
 
         return (
-        <section key={category.category}>
+        <section key={sectionKey(category)}>
           <h3 className={`mb-3 px-1 ${sectionLabelMutedClass}`}>
             {category.category}
           </h3>
           <div className="space-y-2">
             {visibleItems.map((item) => {
-              const key = listItemKey(category.category, item.n);
-              const checked = isChecked(category.category, item.n);
+              const key = listItemKey(category.store, category.category, item.n);
+              const checked = isChecked(category.store, category.category, item.n);
               const isPantry = pantryItems.includes(key);
               const baseLiked = Boolean(item.likedForCurrentWeek);
               const baseHeartCount = item.heartCount ?? 0;
               const pending = pendingHeartState[item.n];
               const liked = pending?.liked ?? baseLiked;
               const heartCount = pending?.heartCount ?? baseHeartCount;
-              const itemUsage = itemUsageByKey?.[getShoppingUsageKey(category.category, item.n)];
-              const displayName = stripTraderJoesForDisplay(item.n);
+              const itemUsage =
+                itemUsageByKey?.[
+                  getShoppingUsageKey(category.category, item.n, item.store ?? category.store)
+                ];
+              const displayName = stripStoreBrandForDisplay(item.n);
               const isPantrySaving = pantrySavingItem === key;
 
               return (
@@ -314,7 +351,7 @@ export default function ListSection({
                 >
                   <button
                     type="button"
-                    onClick={() => toggle(category.category, item.n)}
+                    onClick={() => toggle(category.store, category.category, item.n)}
                     aria-pressed={checked}
                     className="flex min-w-0 flex-1 items-center gap-3"
                   >
@@ -335,10 +372,10 @@ export default function ListSection({
                             {item.q}
                           </span>
                         ) : null}
-                        {type === "shopping" && item.shoppingSource !== "household" ? (
+                        {type === "shopping" ? (
                           <ShoppingSourcePills
                             usage={itemUsage}
-                            isJunk={item.shoppingSource === "junk"}
+                            shoppingSource={item.shoppingSource}
                           />
                         ) : null}
                       </span>
@@ -378,7 +415,7 @@ export default function ListSection({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        togglePantry(category.category, item.n);
+                        togglePantry(category.store, category.category, item.n);
                       }}
                       className={`h-9 px-2.5 flex items-center justify-center rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors ${
                         isPantry 
@@ -389,12 +426,12 @@ export default function ListSection({
                     >
                       Pantry
                     </button>
-                    {type !== "shopping" && item.shoppingSource !== "household" ? (
+                    {type !== "shopping" ? (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteItem(category.category, item.n, item.q);
+                          deleteItem(category.store, category.category, item.n, item.q);
                         }}
                         disabled={isSaving}
                         className="h-9 w-9 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-red-500/10 hover:text-red-500 transition-colors disabled:opacity-50"
@@ -425,7 +462,7 @@ export default function ListSection({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => addItem(category.category)}
+                      onClick={() => addItem(category)}
                       disabled={isSaving}
                       className={`flex-1 text-sm font-medium rounded-lg ${colorClass} text-white py-2 disabled:opacity-50`}
                     >
@@ -471,7 +508,7 @@ export default function ListSection({
             <span className="min-w-0 truncate text-sm text-[var(--foreground)]">
               Removed{" "}
               <strong className="font-semibold">
-                {stripTraderJoesForDisplay(recentlyDeleted.name)}
+                {stripStoreBrandForDisplay(recentlyDeleted.name)}
               </strong>
             </span>
             <button
@@ -517,12 +554,17 @@ const mealTypeUsageDisplay: Record<MealType, { label: string; shortLabel: string
   },
 };
 
+const shoppingSourceDisplay = {
+  junk: { shortLabel: "J", label: "Junk" },
+  staple: { shortLabel: "S", label: "Staple" },
+} as const;
+
 function ShoppingSourcePills({
   usage,
-  isJunk,
+  shoppingSource,
 }: {
   usage?: ShoppingItemUsage;
-  isJunk: boolean;
+  shoppingSource?: "junk" | "staple";
 }) {
   const uniqueMeals = useMemo(() => {
     const seen = new Map<string, { name: string; type: MealType }>();
@@ -535,19 +577,21 @@ function ShoppingSourcePills({
     return Array.from(seen.values());
   }, [usage?.meals]);
 
-  if (uniqueMeals.length === 0 && !isJunk) {
+  const sourceDisplay = shoppingSource ? shoppingSourceDisplay[shoppingSource] : null;
+
+  if (uniqueMeals.length === 0 && !sourceDisplay) {
     return null;
   }
 
   return (
     <span className="mt-1.5 flex flex-wrap gap-1">
-      {isJunk ? (
+      {sourceDisplay ? (
         <span
           className="inline-flex items-center gap-1 rounded-full bg-[#e6dfec] px-2 py-0.5 text-[10px] font-semibold text-[#7d6f8c] dark:bg-[#9b8aa6]/18 dark:text-[#b9a9c6]"
-          title="Junk"
+          title={sourceDisplay.label}
         >
-          <span aria-hidden="true" className="font-black">J</span>
-          <span className="font-medium">Junk</span>
+          <span aria-hidden="true" className="font-black">{sourceDisplay.shortLabel}</span>
+          <span className="font-medium">{sourceDisplay.label}</span>
         </span>
       ) : null}
       {uniqueMeals.map((meal) => {

@@ -121,7 +121,7 @@ export async function updateMealPlanLists(
     mealPlanId: number;
     shoppingListJson: string;
     junkListJson: string;
-    householdGoodsJson: string;
+    staplesJson: string;
     source: string;
     generationContextJson: string;
   }
@@ -137,7 +137,7 @@ export async function updateMealPlanLists(
             $3::jsonb,
             true
           ),
-          '{householdGoods}',
+          '{staples}',
           $4::jsonb,
           true
         ),
@@ -151,7 +151,7 @@ export async function updateMealPlanLists(
       input.mealPlanId,
       input.shoppingListJson,
       input.junkListJson,
-      input.householdGoodsJson,
+      input.staplesJson,
       input.source,
       input.generationContextJson,
     ]
@@ -447,13 +447,14 @@ export async function insertMeal(
         veg,
         engine,
         ingredients,
+        recipe,
         calories,
         protein_grams,
         carbs_grams,
         fat_grams,
         fiber_grams
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13)
       RETURNING id
     `,
     [
@@ -464,6 +465,7 @@ export async function insertMeal(
       mealData.veg,
       mealData.engine,
       JSON.stringify(mealData.ingredients),
+      mealData.recipe ? JSON.stringify(mealData.recipe) : null,
       mealData.calories,
       mealData.protein_grams,
       mealData.carbs_grams,
@@ -588,6 +590,7 @@ export async function updateMeal(
     veg: string[];
     engine: string[];
     ingredients: MealRow["ingredients"];
+    recipe: MealRow["recipe"];
     calories: number;
     protein_grams: number;
     carbs_grams: number;
@@ -606,11 +609,12 @@ export async function updateMeal(
         veg = $6,
         engine = $7,
         ingredients = $8::jsonb,
-        calories = $9,
-        protein_grams = $10,
-        carbs_grams = $11,
-        fat_grams = $12,
-        fiber_grams = $13,
+        recipe = $9::jsonb,
+        calories = $10,
+        protein_grams = $11,
+        carbs_grams = $12,
+        fat_grams = $13,
+        fiber_grams = $14,
         updated_at = NOW()
       WHERE id = $1
       RETURNING *
@@ -624,6 +628,7 @@ export async function updateMeal(
       input.veg,
       input.engine,
       JSON.stringify(input.ingredients),
+      input.recipe ? JSON.stringify(input.recipe) : null,
       input.calories,
       input.protein_grams,
       input.carbs_grams,
@@ -656,13 +661,14 @@ export async function insertMealReturningRow(
         veg,
         engine,
         ingredients,
+        recipe,
         calories,
         protein_grams,
         carbs_grams,
         fat_grams,
         fiber_grams
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13)
       RETURNING *
     `,
     [
@@ -673,6 +679,7 @@ export async function insertMealReturningRow(
       mealData.veg,
       mealData.engine,
       JSON.stringify(mealData.ingredients),
+      mealData.recipe ? JSON.stringify(mealData.recipe) : null,
       mealData.calories,
       mealData.protein_grams,
       mealData.carbs_grams,

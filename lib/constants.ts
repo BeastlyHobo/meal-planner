@@ -1,43 +1,12 @@
 /**
- * System-wide constants for Harvest Meal Engine
- * Single source of truth for all hardcoded values
+ * System-wide constants for Harvest.
+ * Single source of truth for values that are not user-editable settings.
+ *
+ * Week shape and dietary rules are NOT here — they live in the database and are edited
+ * at /settings. See lib/settings.ts.
  */
 
-import type { MealType } from "@/lib/types";
-
-// Week shape — single source of truth for meal counts per type
-export const EXPECTED_MEAL_COUNTS = {
-  Breakfast: 1,
-  Lunch: 1,
-  Dinner: 2,
-} as const;
-
-export const EXPECTED_MEAL_TOTAL = Object.values(EXPECTED_MEAL_COUNTS).reduce(
-  (sum, count) => sum + count,
-  0
-);
-
-// Trader Joe's home-store layout category order
-// Keep aligned with lib/shoppingListOrder.ts.
-export const STORE_CATEGORY_ORDER = [
-  "Flowers",
-  "Prepped Salads",
-  "Herbs",
-  "Vegetables",
-  "Fruit",
-  "Roots",
-  "Beverages",
-  "Deli Meats & Cheeses",
-  "Dairy & Eggs",
-  "Vegan Items",
-  "Pantry Items",
-  "Frozen Food",
-  "Sweets",
-  "Meats & Seafood",
-  "Bread & Tortillas",
-  "Chips",
-  "Beer/Wine"
-] as const;
+import type { MealType, StapleItem } from "@/lib/types";
 
 // Meal Type Ordering
 export const MEAL_TYPES = [
@@ -54,42 +23,46 @@ export const MEAL_TYPE_ORDER = [
   "snack"
 ] as const;
 
-export const HOUSEHOLD_GOODS_SECTION = "Household Goods" as const;
+export const STAPLES_SECTION = "Staples" as const;
 
-export const HOUSEHOLD_GOODS_CATALOG = [
-  {
-    category: "Dishwasher Pods",
-    n: "Trader Joe's Automatic Dishwasher Detergent Packs",
-  },
-  {
-    category: "Dish Soap",
-    n: "Trader Joe's Liquid Dish Soap",
-  },
-  {
-    category: "Laundry Detergent",
-    n: "Trader Joe's Liquid Laundry Detergent",
-  },
-  {
-    category: "3-in-1 Shampoo",
-    n: "Trader Joe's Formula No. 3 \"All For One, One For All\" Shampoo, Conditioner & Body Wash",
-  },
-  {
-    category: "Face Sunscreen",
-    n: "Trader Joe's Daily Facial Sunscreen SPF 40",
-  },
-  {
-    category: "Tissues",
-    n: "Trader Joe's Unscented White Tissue Paper",
-  },
-  {
-    category: "Toilet Paper",
-    n: "Trader Joe's Super Soft Bath Tissue",
-  },
-  {
-    category: "Paper Towels",
-    n: "Trader Joe's Slim Size Paper Towels",
-  },
-] as const;
+/**
+ * The things you buy without re-deciding.
+ *
+ * Sprouts staples ride along on every weekly run; Costco staples ride along on the
+ * monthly warehouse trip. `category` is the stable key (what you'd call the slot);
+ * `n` is the product name that lands on the shopping list. Edit freely — this is a
+ * household's list, not a catalog of anything official.
+ */
+export const STAPLES_CATALOG: readonly StapleItem[] = [
+  // ---- Sprouts, every week ----
+  { category: "Sandwich Turkey", n: "Sliced oven-roasted turkey breast", store: "sprouts", q: "1 lb" },
+  { category: "Sandwich Cheese", n: "Sliced provolone or cheddar", store: "sprouts", q: "1/2 lb" },
+  { category: "Sandwich Bread", n: "Sourdough or whole grain sandwich bread", store: "sprouts", q: "1 loaf" },
+  { category: "Lettuce", n: "Green leaf lettuce", store: "sprouts", q: "1 head" },
+  { category: "Salad Greens", n: "Spring mix", store: "sprouts", q: "1 box" },
+  { category: "Tomatoes", n: "Roma tomatoes", store: "sprouts", q: "4" },
+  { category: "Avocados", n: "Avocados", store: "sprouts", q: "3" },
+  { category: "Bananas", n: "Bananas", store: "sprouts", q: "1 bunch" },
+  { category: "Berries", n: "Blueberries", store: "sprouts", q: "1 pint" },
+  { category: "Greek Yogurt", n: "Plain Greek yogurt", store: "sprouts", q: "32 oz" },
+  { category: "Hummus", n: "Hummus", store: "sprouts", q: "1 tub" },
+  { category: "Flax Brownies", n: "Flax seed brownies", store: "sprouts", q: "1 package" },
+
+  // ---- Costco, every month ----
+  { category: "Toilet Paper", n: "Toilet paper", store: "costco", q: "1 pack" },
+  { category: "Paper Towels", n: "Paper towels", store: "costco", q: "1 pack" },
+  { category: "Trash Bags", n: "Kitchen trash bags", store: "costco", q: "1 box" },
+  { category: "Laundry Detergent", n: "Laundry detergent", store: "costco", q: "1 jug" },
+  { category: "Dishwasher Pods", n: "Dishwasher pods", store: "costco", q: "1 tub" },
+  { category: "Eggs", n: "Eggs", store: "costco", q: "24 count" },
+  { category: "Chicken Thighs", n: "Boneless skinless chicken thighs", store: "costco", q: "6 lb, portion and freeze" },
+  { category: "Ground Beef", n: "Ground beef", store: "costco", q: "4 lb, portion and freeze" },
+  { category: "Salmon", n: "Salmon fillets", store: "costco", q: "3 lb, portion and freeze" },
+  { category: "Shrimp", n: "Frozen raw shrimp", store: "costco", q: "2 lb bag" },
+  { category: "Olive Oil", n: "Olive oil", store: "costco", q: "1 bottle" },
+  { category: "Rice", n: "Jasmine rice", store: "costco", q: "1 bag" },
+  { category: "Coffee", n: "Whole bean coffee", store: "costco", q: "1 bag" },
+];
 
 // Junk category ordering
 export const JUNK_CATEGORY_ORDER = [

@@ -1,7 +1,8 @@
-import { HOUSEHOLD_GOODS_SECTION } from "@/lib/constants";
-import { ListCategory, ListItem, MealInput, StoredMeal, HouseholdGoodsItem } from "@/lib/types";
-import { getItemStoreZone, organizeShoppingListForStoreLayout } from "@/lib/shoppingListOrder";
+import { ListCategory, ListItem, MealInput, StoredMeal, StapleItem } from "@/lib/types";
+import { organizeShoppingListForStoreLayout } from "@/lib/shoppingListOrder";
 import { normalizeShoppingName } from "@/lib/domain/shoppingUsage";
+import { resolveItemStore } from "@/lib/stores";
+import type { StoreKey } from "@/lib/stores/types";
 
 type DerivableMeal = MealInput | StoredMeal;
 
@@ -9,25 +10,40 @@ interface PreservedShoppingItem {
   item: ListItem;
 }
 
+/**
+ * Build the shopping list from what the week actually needs.
+ *
+ * Sources, in priority order: meal ingredients, then junk-list items, then staples. Each
+ * item is routed to a store and an aisle, so the result is a single list that the Shop
+ * screen splits into a weekly run and a bulk run.
+ *
+ * Per-item state the shopper set (checked, pantry, quantity) is carried over from
+ * `previousShoppingList` so re-deriving never wipes progress mid-trip.
+ */
 export function deriveShoppingListFromMeals(
   meals: DerivableMeal[],
   previousShoppingList: ListCategory[] = [],
   junkList: ListCategory[] = [],
-  householdGoods: HouseholdGoodsItem[] = [],
+  staples: StapleItem[] = [],
   options?: { pruneOrphans?: boolean }
 ): ListCategory[] {
   const previousByName = getPreviousItemsByName(previousShoppingList);
   const derivedByName = new Map<string, ListItem>();
 
   for (const meal of meals) {
-    for (const ingredientName of getMealIngredientNames(meal)) {
-      const normalizedName = normalizeShoppingName(ingredientName);
+    for (const ingredient of getMealIngredients(meal)) {
+      const normalizedName = normalizeShoppingName(ingredient.name);
       if (!normalizedName || derivedByName.has(normalizedName)) {
         continue;
       }
 
       const previous = previousByName.get(normalizedName)?.item;
-      derivedByName.set(normalizedName, buildShoppingItem(ingredientName, previous));
+      derivedByName.set(
+        normalizedName,
+        buildShoppingItem(ingredient.name, previous, {
+          store: resolveItemStore(ingredient.name, ingredient.store),
+        })
+      );
     }
   }
 
@@ -45,9 +61,28 @@ export function deriveShoppingListFromMeals(
         buildShoppingItem(itemName, previous, {
           q: junkItem.q,
           shoppingSource: "junk",
+          store: resolveItemStore(itemName, junkItem.store),
         })
       );
     }
+  }
+
+  for (const staple of staples) {
+    const itemName = staple.n.trim();
+    const normalizedName = normalizeShoppingName(itemName);
+    if (!normalizedName || derivedByName.has(normalizedName)) {
+      continue;
+    }
+
+    const previous = previousByName.get(normalizedName)?.item;
+    derivedByName.set(
+      normalizedName,
+      buildShoppingItem(itemName, previous, {
+        q: staple.q,
+        shoppingSource: "staple",
+        store: staple.store,
+      })
+    );
   }
 
   if (!options?.pruneOrphans) {
@@ -55,59 +90,26 @@ export function deriveShoppingListFromMeals(
       if (
         !derivedByName.has(normalizedName) &&
         preserved.item.shoppingSource !== "junk" &&
-        preserved.item.shoppingSource !== "household"
+        preserved.item.shoppingSource !== "staple"
       ) {
         derivedByName.set(normalizedName, preserved.item);
       }
     }
   }
 
-  const storeLayoutList = organizeShoppingListForStoreLayout(
+  return organizeShoppingListForStoreLayout(
     Array.from(derivedByName.values()).map((item) => ({
-      category: getItemStoreZone(item.n),
+      category: "",
+      store: item.store,
       items: [item],
     }))
   );
-
-  const householdSection = buildHouseholdGoodsSection(householdGoods, previousShoppingList);
-  if (!householdSection) {
-    return storeLayoutList;
-  }
-
-  return [...storeLayoutList, householdSection];
-}
-
-function buildHouseholdGoodsSection(
-  householdGoods: HouseholdGoodsItem[],
-  previousShoppingList: ListCategory[]
-): ListCategory | null {
-  if (householdGoods.length === 0) {
-    return null;
-  }
-
-  const previousHousehold = previousShoppingList.find(
-    (category) => category.category === HOUSEHOLD_GOODS_SECTION
-  );
-  const previousByName = new Map(
-    (previousHousehold?.items ?? []).map((item) => [
-      normalizeShoppingName(item.n),
-      item,
-    ])
-  );
-
-  return {
-    category: HOUSEHOLD_GOODS_SECTION,
-    items: householdGoods.map((item) => {
-      const previous = previousByName.get(normalizeShoppingName(item.n));
-      return buildShoppingItem(item.n, previous, { shoppingSource: "household" });
-    }),
-  };
 }
 
 function buildShoppingItem(
   itemName: string,
   previous?: ListItem,
-  options: { q?: string; shoppingSource?: "junk" | "household" } = {}
+  options: { q?: string; shoppingSource?: "junk" | "staple"; store?: StoreKey } = {}
 ): ListItem {
   return {
     n: itemName,
@@ -115,16 +117,22 @@ function buildShoppingItem(
     pantry: previous?.pantry,
     checked: previous?.checked,
     ...(options.shoppingSource ? { shoppingSource: options.shoppingSource } : {}),
+    ...(options.store ? { store: options.store } : {}),
   };
 }
 
-function getMealIngredientNames(meal: DerivableMeal): string[] {
-  const ingredientNames = meal.ingredients
-    ?.map((ingredient) => ingredient.name.trim())
-    .filter(Boolean);
+interface DerivableIngredient {
+  name: string;
+  store?: StoreKey;
+}
 
-  if (ingredientNames?.length) {
-    return ingredientNames;
+function getMealIngredients(meal: DerivableMeal): DerivableIngredient[] {
+  const ingredients = meal.ingredients
+    ?.map((ingredient) => ({ name: ingredient.name.trim(), store: ingredient.store }))
+    .filter((ingredient) => ingredient.name.length > 0);
+
+  if (ingredients?.length) {
+    return ingredients;
   }
 
   return [
@@ -132,17 +140,15 @@ function getMealIngredientNames(meal: DerivableMeal): string[] {
     ...meal.build.base,
     ...meal.build.veg,
     ...meal.build.engine,
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .map((name) => ({ name }));
 }
 
 function getPreviousItemsByName(shoppingList: ListCategory[]) {
   const itemsByName = new Map<string, PreservedShoppingItem>();
 
   for (const category of shoppingList) {
-    if (category.category === HOUSEHOLD_GOODS_SECTION) {
-      continue;
-    }
-
     for (const item of category.items) {
       const normalizedName = normalizeShoppingName(item.n);
       if (!normalizedName || itemsByName.has(normalizedName)) {

@@ -1,7 +1,8 @@
 import { pool, withTransaction } from "@/lib/db";
 import * as mealRepository from "@/lib/db/mealRepository";
 import { mapMeal, mealInputToRow } from "@/lib/domain/mealMappers";
-import { MealIngredient, MealInput, MealRow, MealType, StoredMeal, UpdateMealInput } from "@/lib/types";
+import { MealIngredient, MealInput, MealRow, MealType, Recipe, StoredMeal, UpdateMealInput } from "@/lib/types";
+import { isStoreKey } from "@/lib/stores";
 import { ApiError } from "@/lib/apiUtils";
 import { requireNumber, requireString } from "@/lib/routeValidation";
 
@@ -66,6 +67,7 @@ function parseMealInput(value: unknown): MealInput {
         name: requireString(ingredientObj.name, `ingredients[${index}].name`),
         quantity: typeof ingredientObj.quantity === "string" ? ingredientObj.quantity.trim() : "",
         category: requireString(ingredientObj.category, `ingredients[${index}].category`) as MealIngredient["category"],
+        ...(isStoreKey(ingredientObj.store) ? { store: ingredientObj.store } : {}),
         macros: {
           cal: requireNumber(macrosObj.cal, `ingredients[${index}].macros.cal`),
           p: requireNumber(macrosObj.p, `ingredients[${index}].macros.p`),
@@ -75,6 +77,48 @@ function parseMealInput(value: unknown): MealInput {
         },
       };
     });
+  };
+
+  const parseRecipe = (raw: unknown): Recipe | undefined => {
+    if (raw === undefined || raw === null) {
+      return undefined;
+    }
+
+    if (typeof raw !== "object" || Array.isArray(raw)) {
+      throw new ApiError("recipe must be an object.", 400);
+    }
+
+    const recipeObj = raw as Record<string, unknown>;
+    const steps = Array.isArray(recipeObj.steps)
+      ? recipeObj.steps
+          .filter((step): step is string => typeof step === "string")
+          .map((step) => step.trim())
+          .filter(Boolean)
+      : [];
+
+    // A recipe with no steps is not a recipe; treat it as "no recipe" rather than
+    // storing an empty shell the meal page would render as a blank section.
+    if (steps.length === 0) {
+      return undefined;
+    }
+
+    const equipment = Array.isArray(recipeObj.equipment)
+      ? recipeObj.equipment
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
+
+    const notes = typeof recipeObj.notes === "string" ? recipeObj.notes.trim() : "";
+
+    return {
+      servings: Math.max(1, Math.round(optionalNumber(recipeObj.servings, 4))),
+      prepMinutes: Math.max(0, Math.round(optionalNumber(recipeObj.prepMinutes, 0))),
+      cookMinutes: Math.max(0, Math.round(optionalNumber(recipeObj.cookMinutes, 0))),
+      ...(equipment.length ? { equipment } : {}),
+      steps,
+      ...(notes ? { notes } : {}),
+    };
   };
 
   const macrosRaw = obj.macros;
@@ -88,6 +132,7 @@ function parseMealInput(value: unknown): MealInput {
     type,
     build,
     ingredients: parseIngredients(obj.ingredients),
+    recipe: parseRecipe(obj.recipe),
     macros: {
       cal: requireNumber(macrosObj.cal, "macros.cal"),
       p: requireNumber(macrosObj.p, "macros.p"),
@@ -229,7 +274,7 @@ export async function updateMeal(input: UpdateMealInput): Promise<StoredMeal> {
   try {
     const row = await mealRepository.updateMeal(client, {
       id: input.id,
-      ...mealInputToRow(input),
+      ...mealInputToRow({ ...input, recipe: input.recipe ?? undefined }),
     });
 
     if (!row) {
@@ -246,7 +291,10 @@ export async function insertMeal(input: Omit<UpdateMealInput, "id">): Promise<St
   const client = await pool.connect();
 
   try {
-    const row = await mealRepository.insertMealReturningRow(client, mealInputToRow(input));
+    const row = await mealRepository.insertMealReturningRow(
+      client,
+      mealInputToRow({ ...input, recipe: input.recipe ?? undefined })
+    );
     return mapMeal(row);
   } finally {
     client.release();

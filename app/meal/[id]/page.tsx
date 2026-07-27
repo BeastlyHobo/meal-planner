@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Heart, Loader2, Pencil } from "lucide-react";
+import { ArrowLeft, Clock, Heart, Loader2, Pencil, Users, UtensilsCrossed } from "lucide-react";
 import MealEditorModal from "@/components/MealEditorModal";
 import { MacroRow } from "@/components/MealCardView";
 import MealPlanGate from "@/components/MealPlanGate";
 import { useMealHeart } from "@/lib/hooks/useMealHeart";
 import { useMealPlan } from "@/lib/MealPlanProvider";
-import { MealIngredient, StoredMeal } from "@/lib/types";
-import { stripTraderJoesForDisplay } from "@/lib/displayFormatters";
+import { MealIngredient, Recipe, StoredMeal } from "@/lib/types";
+import { stripStoreBrandForDisplay } from "@/lib/displayFormatters";
 import { cardClass } from "@/lib/uiClasses";
 import { buildHref } from "@/lib/urlState";
 
@@ -135,7 +135,7 @@ function MealDetail({
               <li key={`${ingredient.name}-${idx}`} className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <span className="block text-sm font-semibold text-[var(--foreground)]">
-                    {stripTraderJoesForDisplay(ingredient.name)}
+                    {stripStoreBrandForDisplay(ingredient.name)}
                   </span>
                   <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                     {categoryLabel[ingredient.category]}
@@ -152,12 +152,14 @@ function MealDetail({
           <ul className="space-y-1.5 text-sm text-[var(--foreground)]">
             {[...meal.build.pro, ...meal.build.base, ...meal.build.veg, ...meal.build.engine].map(
               (item, idx) => (
-                <li key={`${item}-${idx}`}>{stripTraderJoesForDisplay(item)}</li>
+                <li key={`${item}-${idx}`}>{stripStoreBrandForDisplay(item)}</li>
               )
             )}
           </ul>
         )}
       </div>
+
+      {meal.recipe ? <RecipeCard recipe={meal.recipe} /> : null}
 
       <button
         type="button"
@@ -178,5 +180,57 @@ function MealDetail({
         }}
       />
     </>
+  );
+}
+
+function RecipeCard({ recipe }: { recipe: Recipe }) {
+  const totalMinutes = recipe.prepMinutes + recipe.cookMinutes;
+
+  return (
+    <div className={`mt-4 p-4 ${cardClass}`}>
+      <span className="mb-3 block text-[10px] font-black uppercase tracking-[0.18em] text-harvest-terracotta">
+        Recipe
+      </span>
+
+      <div className="mb-4 flex flex-wrap gap-2 text-[11px] font-semibold text-[var(--muted-text)]">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-stone)] px-2.5 py-1 dark:bg-[var(--surface-2)]">
+          <Clock size={12} />
+          {totalMinutes} min
+          {recipe.prepMinutes > 0 && recipe.cookMinutes > 0 ? (
+            <span className="font-normal opacity-70">
+              ({recipe.prepMinutes} prep · {recipe.cookMinutes} cook)
+            </span>
+          ) : null}
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-stone)] px-2.5 py-1 dark:bg-[var(--surface-2)]">
+          <Users size={12} />
+          Serves {recipe.servings}
+        </span>
+      </div>
+
+      {recipe.equipment?.length ? (
+        <p className="mb-4 flex items-start gap-1.5 text-xs text-[var(--muted-text)]">
+          <UtensilsCrossed size={13} className="mt-0.5 shrink-0" />
+          <span>{recipe.equipment.join(" · ")}</span>
+        </p>
+      ) : null}
+
+      <ol className="space-y-3">
+        {recipe.steps.map((step, idx) => (
+          <li key={`${idx}-${step.slice(0, 24)}`} className="flex gap-3">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-harvest-green/10 text-[11px] font-black text-harvest-green">
+              {idx + 1}
+            </span>
+            <span className="text-sm leading-relaxed text-[var(--foreground)]">{step}</span>
+          </li>
+        ))}
+      </ol>
+
+      {recipe.notes ? (
+        <p className="mt-4 rounded-xl bg-[var(--tint-gold)] px-3 py-2.5 text-xs leading-relaxed text-[var(--foreground)]">
+          {recipe.notes}
+        </p>
+      ) : null}
+    </div>
   );
 }

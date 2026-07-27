@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import type { StoreKey } from "@/lib/types";
 
-type ListType = "shopping" | "junk" | "household";
+type ListType = "shopping" | "junk" | "staple";
 
 interface UseListMutationsOptions {
   type: ListType;
@@ -19,7 +20,7 @@ export function useListMutations({
 }: UseListMutationsOptions) {
   const endpoint = useMemo(() => {
     if (type === "junk") return "/api/mealplan/junk";
-    if (type === "household") return "/api/mealplan/household-goods";
+    if (type === "staple") return "/api/mealplan/staples";
     return "/api/mealplan/shopping";
   }, [type]);
   const [isSaving, setIsSaving] = useState(false);
@@ -105,12 +106,14 @@ export function useListMutations({
 
   const togglePantry = useCallback(
     async ({
+      store,
       category,
       itemName,
       pantry,
       onOptimisticUpdate,
       onRollback,
     }: {
+      store?: StoreKey;
       category: string;
       itemName: string;
       pantry: boolean;
@@ -118,12 +121,13 @@ export function useListMutations({
       onRollback: () => void;
     }) => {
       if (pantrySavingItem) return;
-      setPantrySavingItem(`${category}::${itemName}`);
+      setPantrySavingItem(`${store ?? ""}::${category}::${itemName}`);
       onOptimisticUpdate();
 
       try {
         await mutateList("PATCH", {
           weekRange,
+          store,
           category,
           itemName,
           pantry,
@@ -139,16 +143,17 @@ export function useListMutations({
   );
 
   const deleteItem = useCallback(
-    async (category: string, itemName?: string) => {
+    async (category: string, itemName?: string, store?: StoreKey) => {
       if (isSaving) return;
       setIsSaving(true);
 
       try {
-        if (type === "household") {
+        if (type === "staple") {
           await mutateList("DELETE", { weekRange, category });
         } else {
           await mutateList("DELETE", {
             weekRange,
+            store,
             category,
             itemName,
           });
@@ -165,17 +170,18 @@ export function useListMutations({
   );
 
   const addItem = useCallback(
-    async (category: string, itemName?: string, itemQty?: string) => {
+    async (category: string, itemName?: string, itemQty?: string, store?: StoreKey) => {
       if (isSaving) return false;
       setIsSaving(true);
 
       try {
-        if (type === "household") {
+        if (type === "staple") {
           await mutateList("POST", { weekRange, category });
         } else {
           if (!itemName?.trim()) return false;
           await mutateList("POST", {
             weekRange,
+            store,
             category,
             item: {
               n: itemName.trim(),

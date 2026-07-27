@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS meals (
   veg TEXT[] NOT NULL DEFAULT '{}',
   engine TEXT[] NOT NULL DEFAULT '{}',
   ingredients JSONB NOT NULL DEFAULT '[]'::jsonb,
+  recipe JSONB,
   calories INTEGER NOT NULL,
   protein_grams INTEGER NOT NULL,
   carbs_grams INTEGER NOT NULL,
@@ -52,8 +53,8 @@ CREATE INDEX IF NOT EXISTS idx_meals_appearance_count
 CREATE INDEX IF NOT EXISTS idx_meals_name
   ON meals (name ASC, id ASC);
 
--- A week is a flat, ordered list of meals (1 breakfast, 1 lunch, 2 dinners).
--- slot_order is the position within the week (0..3); there are no days.
+-- A week is a flat, ordered list of meals whose shape comes from app_settings
+-- (by default 4 dinners). slot_order is the position within the week; there are no days.
 CREATE TABLE IF NOT EXISTS meal_plan_meals (
   id BIGSERIAL PRIMARY KEY,
   meal_plan_id BIGINT NOT NULL REFERENCES meal_plans(id) ON DELETE CASCADE,
@@ -84,6 +85,14 @@ CREATE INDEX IF NOT EXISTS idx_meal_feedback_meal_id
 
 CREATE INDEX IF NOT EXISTS idx_meal_feedback_meal_plan_id
   ON meal_feedback (meal_plan_id);
+
+-- Household settings: week shape and dietary rules, edited at /settings.
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 CREATE TABLE IF NOT EXISTS meal_ratings (
   id BIGSERIAL PRIMARY KEY,

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Harvest Meal Plan",
     short_name: "Harvest",
     description:
-      "Plan the week's Trader Joe's meals and shop the list in-store, even with no signal.",
+      "Plan the week's dinners and shop Sprouts and Costco in-store, even with no signal.",
     start_url: "/menu",
     scope: "/",
     display: "standalone",

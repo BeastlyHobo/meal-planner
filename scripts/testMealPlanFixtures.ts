@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { validateMealPlanFile } from "./mealPlanValidation";
 
-// Re-add published meal-plan fixtures here once they match EXPECTED_MEAL_COUNTS in lib/constants.ts.
+// Published weeks that must stay valid. A fixture only belongs here while it matches the
+// default week shape in lib/settings.ts — a week authored against custom settings will
+// fail the meal-count check here even though it is fine in the app.
 const fixturePaths: string[] = [
-  // "data/mealplans/mealplan-week-YYYY-MM-DD.md",
+  "data/current-week.md",
+  "data/mealplans/mealplan-week-2026-07-27.md",
 ];
 
 for (const fixturePath of fixturePaths) {

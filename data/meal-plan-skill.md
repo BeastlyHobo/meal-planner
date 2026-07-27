@@ -8,57 +8,71 @@
 
 ```
 === HARVEST MEAL ENGINE CONTEXT ===
-You are operating the Harvest meal planning engine for Trader Joe's weeks.
+You are operating the Harvest meal planning engine for a two-store household:
+Sprouts about twice a week, Costco about once a month.
+
+✅ SETTINGS ARE THE SOURCE OF TRUTH (read them every session):
+- GET /api/settings returns weekShape and dietary rules. Defaults are in lib/settings.ts.
+- weekShape decides how many of each meal type the week contains. Do NOT assume a shape.
+- Default shape is 4 dinners and nothing else; breakfast and lunch come off the staples list.
+- dietary carries: calorie window, protein floor, fiber floor, max cook minutes,
+  servings per dinner, protein rotation, cuisine rotation, a never-use list, and notes.
+- Never hardcode a diner rule in a plan. If a rule should persist, it belongs in settings.
 
 ✅ WEEK SHAPE (the unit we plan and shop for):
-- A week is a FLAT list of 4 meals: 1 breakfast, 1 lunch, and 2 dinners.
-- There are NO days and NO timeslots. Do not assign meals to Monday/Tuesday.
+- A week is a FLAT list of meals. There are NO days and NO timeslots.
 - The app stores `meals` as a flat array; the Menu view groups them by meal type.
-- The 4-meal mix exists because it is a convenient one-trip shop.
 
-✅ PRIMARY DINER MEALS (read `data/diner-preferences.md` every session — source of truth):
-- All meals loosely 450–550 kcal. Fiber first-class on every ingredient and meal.
-- 20–30 min cooks, up to two pans. Frozen entrées ≤1–2/week.
-- ≥3 protein types/week. Vegetarian meals are fine when they fit the week, but not required.
-- Hard no: pineapple. No duplicate engine or base across the week.
-- No repeated cuisine profile in the same week. Vary breakfast style (not both sweet, not both oat-heavy).
-- Lunch: assemble only — no cooking.
-- Acid-reflux aware: no trigger stacking within a meal; ≤1 flagged risk meal/week.
-- Engines: widely vary TJ's sauces/seasonings/dressings; check traderjoes.com and Fearless Flyer; no duplicate engine across week.
+✅ TWO STORES, TWO RHYTHMS:
+- Sprouts (weekly): fresh produce, deli, cheese, dairy, bread, sauces, pantry odds and ends.
+- Costco (monthly): raw proteins to portion and freeze, freezer stock, paper goods,
+  cleaning supplies, large-format pantry staples.
+- Plan dinners around proteins ALREADY IN THE FREEZER from the last Costco run.
+- Items route automatically (lib/stores/routing.ts). Set `"store": "costco"` or
+  `"store": "sprouts"` on an ingredient to override.
+- Do NOT author `shoppingList`. It is derived from ingredients, junk, and staples, then
+  split by store and ordered by each store's walk order.
+
+✅ RECIPES ARE REQUIRED ON DINNERS:
+- Every Dinner needs `recipe` with `servings`, `prepMinutes`, `cookMinutes`, and `steps`.
+- `steps` is an ordered array of imperative instructions. `equipment` and `notes` optional.
+- Steps name doneness cues, not just times. Call out the failure mode when there is one.
+- Total time should fit `maxCookMinutes` from settings.
+- `servings` should meet `servingsPerDinner` from settings (default 4: two adults plus leftovers).
+- Assemble-only meals may omit `recipe`. Dinners may not.
 
 ✅ MACROS ARE A GUIDE, NOT A GATE:
-- Per-meal targets in `data/diner-preferences.md`. No hard daily targets or macro warnings.
-- Getting calories exactly right is NOT required. Prioritize satisfying, varied, real Trader Joe's meals.
+- Targets come from settings. Getting calories exactly right is NOT required.
+- Prioritize satisfying, varied, real meals over hitting a number.
+- Per-ingredient macros must sum to the meal's macros (tolerance 1).
 
 ✅ FIBER IS A FIRST-CLASS MACRO:
-- Every `macros` object (per-ingredient AND per-meal) must include `fiber` (grams), alongside `cal`, `p`, `c`, `f`.
-- The meal's `macros.fiber` should equal the sum of its ingredients' fiber.
-- Favor fiber-rich builds (legumes, whole grains, vegetables, fruit).
+- Every `macros` object (per-ingredient AND per-meal) must include `fiber` in grams.
+- Favor legumes, whole grains, vegetables, and seeds over supplements to clear the floor.
 
 ✅ THE 4-PILLAR BUILD SYSTEM (always):
-  1. PRO: High density protein
-  2. BASE: Complex carb / filler
-  3. VEG: Fiber / micronutrients
-  4. ENGINE: Signature Trader Joe's flavor anchor
+  1. PRO: protein — more than one entry is fine (beans and cheese alongside the meat)
+  2. BASE: grain, starch, or bread
+  3. VEG: vegetables and fresh herbs
+  4. ENGINE: the flavor anchor the dish is built on
 - `build` values are arrays of strings. Total build items 4-7 (most 4-5).
-- No repeated engine or base within a single meal. No duplicate engine or base across the week.
-- Use at least 3 different protein types across the week.
-- Do not repeat a full meal that was served in the last ~2 weeks.
-- For the companion junk list, follow `data/companion-preferences.md`.
+- No duplicate base or engine across the week.
+- Rotate proteins, cuisines, AND techniques. Four skillet dinners is a repeat.
+- Do not repeat a full meal served in the last ~2 weeks.
 
 ✅ FORMAT RULES:
-- All output must use the EXACT JSON schema from existing meal plans (a top-level `meals` array; no `days`, no `dailyTarget`)
-- Every `macros` object includes `fiber`
-- No generic pantry fillers as named ingredients (no bare "olive oil", "salt", "garlic")
-- Prefer real Trader Joe's product names; plain produce is fine for veg/fruit
-- Do not author `shoppingList`; it is derived from meal ingredients and grouped by store layout order
-- Always include the junk list — build it per `data/companion-preferences.md`
-- Junk category strings must exactly match: Coffee/Creamer, Beer/Wine, Chips, Sweets, Frozen Food, Frozen Treats, Beverages/Drinks
+- Match the JSON schema in data/current-week.md exactly (top-level `meals`; no `days`).
+- No generic pantry filler as a named ingredient (no bare "olive oil", "salt", "garlic")
+  unless it is genuinely something to buy.
+- Plain ingredient names beat brand names. "Boneless skinless chicken thighs", not a SKU.
+- Always include the junk list per data/companion-preferences.md.
+- Junk categories must match exactly, in order: Coffee/Creamer, Beer/Wine, Chips, Sweets,
+  Frozen Food, Frozen Treats, Beverages/Drinks.
 
 ✅ SHOPPING SECTION ORDER:
-- Derived shopping lists use the home-store walk order documented in `data/shopping-areas.md`
-- Vegan Items means the refrigerated vegan/plant-based area only. Beans/lentils stay Pantry Items; frozen vegan items stay Frozen Food.
-- Dairy & Eggs is separate from Deli Meats & Cheeses.
+- Derived lists follow the per-store walk orders in data/shopping-areas.md.
+- Validation reports any item that falls back to a store's pantry zone. Fix it by adding
+  a keyword rule in lib/stores/sprouts.ts or lib/stores/costco.ts, not by renaming food.
 
 ✅ PIPELINE COMPATIBILITY:
 - Generated plans go in data/mealplans/
@@ -67,44 +81,32 @@ You are operating the Harvest meal planning engine for Trader Joe's weeks.
 - Never break the JSON structure
 
 ✅ AESTHETIC:
-- Meal names should sound like high-end cafe menu items
-- Clean, professional, appetizing wording
-- No emojis, no slang
+- Meal names should read like a good neighborhood restaurant's menu.
+- Clean, appetizing, specific. No emojis, no slang.
 ```
-
-## Keeping Trader Joe's Items Current
-
-Every ingredient and junk-list item should be a real, currently available Trader Joe's product when possible. Consult the Fearless Flyer:
-
-- **Source of truth for new/seasonal items:** [https://www.traderjoes.com/home/ff](https://www.traderjoes.com/home/ff)
-
-How to use it:
-
-- Before generating a week, check the flyer for new or seasonal items and work a few into meals and the junk list when they fit.
-- Prefer flyer/seasonal items when they fit a pillar, but never sacrifice a valid 4-pillar build just to include one.
-- Still prefer real TJ's product names (e.g. "Trader Joe's Soy Chorizo"), with plain produce allowed as veg/fruit.
 
 ## Preference Sources
 
-| Role | File |
+| Role | Source |
 |---|---|
-| Primary diner meals | `data/diner-preferences.md` |
-| Companion junk list | `data/companion-preferences.md` |
-| Product / quality context | `data/data_context.md` |
+| Week shape and dietary rules | `GET /api/settings` (edited at `/settings`) |
+| How a good week is shaped | `data/diner-preferences.md` |
+| Junk list | `data/companion-preferences.md` |
+| Ingredient and product guidance | `data/data_context.md` |
+| Store layouts and routing | `data/shopping-areas.md` |
 | Publish checklist | `data/MEAL_PLAN_PRODUCTION_WORKFLOW.md` |
 
-Read the preference files at the start of every planning session. Do not duplicate their full rules here.
+Read settings and the preference files at the start of every planning session. Do not
+duplicate their rules here — they change.
 
 ## Available Commands
 
 | Command | Description |
 |---|---|
-| `/meal-plan new [YYYY-MM-DD]` | Scaffold a new week markdown file in `data/mealplans/` (1 breakfast / 1 lunch / 2 dinners) |
+| `/meal-plan new [YYYY-MM-DD]` | Scaffold a new week markdown file in `data/mealplans/` |
 | `/meal-plan generate` | Scaffold a week plan ready to fill in |
-| `/meal-plan validate [file]` | Validate meal shape, fiber, macro totals, duplicate bases/engines, junk categories, shopping order |
-| `/meal-plan publish [file]` | Copy draft to `current-week.md` and run local sync + publish (reachable DB) |
-
-> The CLI helpers in `scripts/mealPlanSkill.ts` are for local/dev use. Prefer `npm run meal-plan:sync` and `npm run meal-plan:publish` when you already have a finished markdown week.
+| `/meal-plan validate [file]` | Validate meal counts, fiber, macro totals, recipes, duplicate bases/engines, junk categories, and shopping classification |
+| `/meal-plan publish [file]` | Copy draft to `current-week.md` and run local sync + publish |
 
 ## Local Publish Flow
 
@@ -114,23 +116,28 @@ npm run test:meal-plan-tools
 npm run meal-plan -- publish data/mealplans/mealplan-week-YYYY-MM-DD.md
 ```
 
-Or sync/publish the current week directly:
+Or sync and publish the current week directly:
 
 ```bash
 npm run meal-plan:sync
 npm run meal-plan:publish
 ```
 
-Host-side DB scripts need `DATABASE_URL` (see `.env.example`). Use `docker-compose.dev.yml` so Postgres is on `localhost:5432`, or point at a reachable instance.
+Host-side DB scripts need `DATABASE_URL` (see `.env.example`). Use `docker-compose.dev.yml`
+so Postgres is on `localhost:5432`, or point at a reachable instance.
 
 ## Output Template
 
-File: `data/mealplans/mealplan-week-YYYY-MM-DD.md`. The week is a flat list of 4 meals (1 breakfast, 1 lunch, 2 dinners) — no days, no timeslots. `build` values are arrays. Per-ingredient `macros` (including `fiber`) should sum to the meal `macros`. Do not author `shoppingList` — it is derived from `ingredients`.
+File: `data/mealplans/mealplan-week-YYYY-MM-DD.md`. The week is a flat list of meals whose
+counts come from settings. `build` values are arrays. Per-ingredient `macros` (including
+`fiber`) must sum to the meal `macros`. Do not author `shoppingList`.
 
-```markdown
+`data/current-week.md` is the worked reference — copy its structure.
+
+````markdown
 # Current Week Plan: [Month] [Day] — [Month] [Day]
 
-Active week of food: one breakfast, one lunch, and two dinners — a full week shopped in one trip. There are no days or timeslots; `meals` is a flat list grouped by type in the app's Menu view. Fiber is a first-class macro on every ingredient and meal.
+[One or two lines on what this week is: cuisines, proteins, anything notable.]
 
 ## Canonical JSON
 ```json
@@ -138,22 +145,33 @@ Active week of food: one breakfast, one lunch, and two dinners — a full week s
   "weekRange": "[start] — [end]",
   "meals": [
     {
-      "type": "Breakfast",
-      "name": "[Cafe-style Meal Name]",
+      "type": "Dinner",
+      "name": "[Restaurant-style Meal Name]",
       "build": {
-        "pro": ["[TJ's Protein]"],
-        "base": ["[TJ's Base]"],
+        "pro": ["[Protein]"],
+        "base": ["[Base]"],
         "veg": ["[Veg]"],
-        "engine": ["[TJ's Flavor Engine]"]
+        "engine": ["[Flavor anchor]"]
       },
       "ingredients": [
-        { "name": "[item]", "quantity": "[amount]", "category": "pro", "macros": { "cal": 0, "p": 0, "c": 0, "f": 0, "fiber": 0 } }
+        { "name": "[item]", "quantity": "[amount]", "category": "pro", "store": "costco", "macros": { "cal": 0, "p": 0, "c": 0, "f": 0, "fiber": 0 } }
       ],
+      "recipe": {
+        "servings": 4,
+        "prepMinutes": 10,
+        "cookMinutes": 25,
+        "equipment": ["Large skillet"],
+        "steps": [
+          "[Imperative step with a doneness cue.]",
+          "[Next step.]"
+        ],
+        "notes": "[Storage, make-ahead, or substitution notes.]"
+      },
       "macros": { "cal": 0, "p": 0, "c": 0, "f": 0, "fiber": 0 }
-    },
-    { "type": "Lunch",     "name": "...", "build": { "pro": [], "base": [], "veg": [], "engine": [] }, "ingredients": [], "macros": { "cal": 0, "p": 0, "c": 0, "f": 0, "fiber": 0 } },
-    { "type": "Dinner",    "name": "...", "build": { "pro": [], "base": [], "veg": [], "engine": [] }, "ingredients": [], "macros": { "cal": 0, "p": 0, "c": 0, "f": 0, "fiber": 0 } },
-    { "type": "Dinner",    "name": "...", "build": { "pro": [], "base": [], "veg": [], "engine": [] }, "ingredients": [], "macros": { "cal": 0, "p": 0, "c": 0, "f": 0, "fiber": 0 } }
+    }
+  ],
+  "staples": [
+    { "category": "Sandwich Turkey", "n": "Sliced oven-roasted turkey breast", "store": "sprouts", "q": "1 lb" }
   ],
   "junkList": [
     { "category": "Coffee/Creamer", "items": [] },
@@ -166,3 +184,7 @@ Active week of food: one breakfast, one lunch, and two dinners — a full week s
   ]
 }
 ```
+````
+
+`staples` may be omitted on a draft — the app seeds it from `STAPLES_CATALOG` in
+`lib/constants.ts` and the Staples tab manages it per week.

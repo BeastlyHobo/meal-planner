@@ -1,3 +1,7 @@
+import type { StoreKey } from "@/lib/stores/types";
+
+export type { StoreKey };
+
 export interface Macros {
   cal: number;
   p: number;
@@ -11,6 +15,24 @@ export interface MealIngredient {
   quantity: string;
   category: "pro" | "base" | "veg" | "engine";
   macros: Macros;
+  /**
+   * Which store this ingredient comes from. Omit to let lib/stores/routing.ts decide
+   * (fresh items default to the weekly store; meat and bulk go to the warehouse run).
+   */
+  store?: StoreKey;
+}
+
+/** How to actually cook a meal. Optional — assemble-only meals do not need one. */
+export interface Recipe {
+  servings: number;
+  prepMinutes: number;
+  cookMinutes: number;
+  /** Pans, sheet trays, appliances. Keep it to what you have to get out. */
+  equipment?: string[];
+  /** Numbered instructions, in order. */
+  steps: string[];
+  /** Make-ahead, storage, or substitution notes. */
+  notes?: string;
 }
 
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
@@ -28,6 +50,7 @@ export interface MealInput {
   build: MealBuild;
   ingredients?: MealIngredient[];
   macros: Macros;
+  recipe?: Recipe;
 }
 
 export interface StoredMeal extends MealInput {
@@ -49,9 +72,18 @@ export interface MutateMealPlanCompositionInput {
   type?: MealType;
 }
 
-export interface HouseholdGoodsItem {
+/**
+ * A recurring item you buy on essentially every run — the turkey, cheese, and lettuce
+ * you never re-decide, plus the paper goods on the monthly warehouse trip. Staples are
+ * kept per-week so a week can drop one, but they are seeded from STAPLES_CATALOG.
+ */
+export interface StapleItem {
+  /** Stable identity within a store, e.g. "Sandwich Turkey". Used as the list key. */
   category: string;
+  /** The actual product name that lands on the shopping list. */
   n: string;
+  store: StoreKey;
+  q?: string;
 }
 
 export interface ListItem {
@@ -59,7 +91,9 @@ export interface ListItem {
   q?: string;
   pantry?: boolean;
   checked?: boolean;
-  shoppingSource?: "junk" | "household";
+  shoppingSource?: "junk" | "staple";
+  /** Resolved store for this item; set when the list is organized for store layout. */
+  store?: StoreKey;
   // Junk-only enrichment fields (safe to be absent for shopping items)
   junkItemId?: number;
   heartCount?: number;
@@ -68,6 +102,8 @@ export interface ListItem {
 
 export interface ListCategory {
   category: string;
+  /** Which store's layout this section belongs to. Absent on junk lists. */
+  store?: StoreKey;
   items: ListItem[];
 }
 
@@ -77,7 +113,7 @@ export interface WeekData<TMeal = MealInput> {
   meals: TMeal[];
   shoppingList?: ListCategory[];
   junkList: ListCategory[];
-  householdGoods?: HouseholdGoodsItem[];
+  staples?: StapleItem[];
   feedback?: MealFeedback[];
 }
 
@@ -104,7 +140,7 @@ export interface StoredMealPlan {
   meals: StoredMeal[];
   shoppingList: ListCategory[];
   junkList: ListCategory[];
-  householdGoods: HouseholdGoodsItem[];
+  staples: StapleItem[];
   source: string;
   status: string;
   generationContext: Record<string, unknown>;
@@ -126,6 +162,7 @@ export interface UpdateMealInput {
   build: MealBuild;
   ingredients?: MealIngredient[];
   macros: Macros;
+  recipe?: Recipe | null;
 }
 
 // Database Row Types
@@ -135,7 +172,9 @@ export interface MealPlanRow {
   plan_data: {
     shoppingList: StoredMealPlan["shoppingList"];
     junkList: StoredMealPlan["junkList"];
-    householdGoods?: StoredMealPlan["householdGoods"];
+    staples?: StoredMealPlan["staples"];
+    /** Pre-two-store plans stored household goods separately; read for migration only. */
+    householdGoods?: Array<{ category: string; n: string }>;
   };
   source: string;
   status: string;
@@ -153,6 +192,7 @@ export interface MealRow {
   veg: string[];
   engine: string[];
   ingredients: MealIngredient[];
+  recipe: Recipe | null;
   calories: number;
   protein_grams: number;
   carbs_grams: number;

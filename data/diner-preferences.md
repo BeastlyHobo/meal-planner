@@ -1,166 +1,110 @@
-# Primary Diner — Harvest Meal Preferences
+# Diner Preferences
 
-> Referenced by: `data/data_context.md`, `data/MEAL_PLAN_PRODUCTION_WORKFLOW.md`
+> Referenced by: `data/data_context.md`, `data/meal-plan-skill.md`, `data/MEAL_PLAN_PRODUCTION_WORKFLOW.md`
 
-Demo preferences for the person who eats and cooks the weekly meals. The companion junk list is managed separately in `data/companion-preferences.md`.
+**The numbers live in the app, not in this file.** Week shape, calorie window, protein and
+fiber floors, cook-time ceiling, servings per dinner, protein rotation, cuisine rotation,
+and the never-use list are all edited at **`/settings`** and stored in the database.
 
----
+Read them with:
 
-## Week Shape
+```bash
+curl -s http://localhost:3000/api/settings | jq .data.settings
+```
 
-4 meals per week: **1 breakfast, 1 lunch, 2 dinners.**
-No day scheduling. No daily calorie targets. Meals are a flat list.
+The defaults are in `lib/settings.ts` (`DEFAULT_SETTINGS`). `describeSettings()` renders
+them as a plain-text brief you can paste into a planning session.
 
----
-
-## Calorie Targets
-
-**All meals: 450–550 kcal.**
-Apply loosely — flavor and satiety matter more than hitting exact numbers.
-
----
-
-## Cooking Parameters
-
-- **Time ceiling: 20–30 minutes**, using up to two pans (breakfasts and dinners).
-- Techniques in scope: sear, sauté, boil, roast (if it fits the time window), assemble.
-- **Lunch is the exception:** assemble only — no cooking (see Lunch Style).
-- No project meals. Consistent weeknight effort across the week.
-- Frozen grains and vegetables are freely usable. Fully frozen entrées: **≤1–2 per week maximum.**
+This file holds the things that are not numbers — the shape of a good week and the
+judgment calls the settings cannot express.
 
 ---
 
-## Protein Roster
+## What a week is
 
-Rotate across these proteins. Aim for **≥3 different protein types per week.**
+A flat list of meals. No days, no timeslots — you decide on Tuesday what Tuesday is.
 
-| Protein | Notes |
+The default is **four dinners and nothing else**, because breakfast and lunch come off
+the recurring staples list rather than being planned. If you want planned breakfasts or
+lunches, raise their counts at `/settings` and the Menu grows tabs for them.
+
+Four dinners plus leftovers covers a week for two people without waste. Planning more is
+the most common way this app stops getting used.
+
+---
+
+## Two stores, two rhythms
+
+- **Sprouts, about twice a week.** Fresh produce, deli, cheese, dairy, bread, and the
+  sauces a week's dinners need.
+- **Costco, about once a month.** Raw proteins to portion and freeze, freezer stock,
+  paper goods, cleaning supplies, and large-format pantry staples.
+
+**Plan dinners around proteins that are already in the freezer.** A week that sends you
+to Costco mid-month has failed. The Costco tab on the Shop screen is the running list for
+the next warehouse run, not a list for this week.
+
+---
+
+## Meal structure (four pillars)
+
+| Pillar | Description |
 |---|---|
-| Chicken thighs | Preferred over breast for flavor and forgiveness |
-| Chicken breast | Fine, but use thighs when either would work |
-| Ground beef or turkey | Good for bowls, stir-fry bases, tacos |
-| Shrimp | Keep in rotation as a regular option |
-| Fish (salmon, white fish) | Salmon or white fish (cod, tilapia, halibut); rotate types |
-| Eggs | Breakfast and lunch staple |
-| Tofu / tempeh | For vegetarian meals; marinate or crisp properly |
-| Meat substitutes | Beyond, Quorn, etc. — acceptable for vegetarian variety |
-| Legumes | Lentils, chickpeas, black beans — first-class protein, not a side |
+| `pro` | Protein. Can be more than one — beans and cheese alongside the meat both count. |
+| `base` | Grain, starch, or bread |
+| `veg` | Vegetables and fresh herbs |
+| `engine` | The flavor anchor: the sauce, paste, or condiment the dish is built on |
 
-**Hard no:** Pineapple (in any meal, any context).
+Total build items: 4–7, most weeks 4–5.
+
+**No duplicate `base` or `engine` across a week.** Two rice bowls in one week is the
+fastest way to get bored, and the validator enforces it.
 
 ---
 
-## Vegetarian Meals
+## Recipes
 
-Vegetarian meals are welcome when they fit the week. When included, make them satisfying and protein-complete. Legumes, tofu, tempeh, eggs, and meat substitutes all qualify.
+Every dinner gets a recipe. Not a link, not a vibe — numbered steps you can follow at
+6pm without thinking.
 
----
+- **Steps are imperative and specific.** "Sear 5 to 6 minutes per side until deeply
+  browned" beats "cook the chicken."
+- **Say what to look for, not just how long.** Doneness cues survive a different pan.
+- **Name the failure mode when there is one.** "Wet shrimp will not brown." "A tight O
+  means overcooked."
+- **Notes cover storage, make-ahead, and substitutions** — the things you want to know
+  the second time you cook it, not the first.
+- **Fit the time ceiling** (`maxCookMinutes` in settings). Prep plus cook. The validator
+  warns when a recipe runs over rather than rejecting it, because a 45-minute braise on a
+  40-minute ceiling is your call.
 
-## Cuisine Profile
-
-Bold, globally inspired flavors. Rotate across these cuisines — don't repeat the same profile more than once per week.
-
-- Thai / Southeast Asian
-- Indian
-- Mediterranean / Middle Eastern
-- Mexican / Tex-Mex
-- Chinese / Taiwanese
-- American comfort with a twist
-
-**Flavor targets:** umami, heat, fresh herbs. Avoid bland proteins and boring builds.
-
----
-
-## Breakfast Style
-
-Mix styles each week — **don't serve two oat-heavy or two sweet breakfasts in the same week.**
-
-- **Savory:** eggs, grain bowls, protein-forward builds
-- **Sweet but substantial:** oats done interestingly, yogurt builds with real protein and fiber
+Assemble-only meals do not need a recipe. Dinners always do.
 
 ---
 
-## Lunch Style
+## Variety
 
-Lunch should be **assemble only — no cooking.**
-
-- No stovetop, oven, sautéing, boiling, roasting, or microwaving for the lunch build.
-- OK: open, drain, rinse, chop, and combine ready-to-eat components.
-- Still hit 450–550 kcal with adequate protein and fiber.
+- **Rotate proteins.** Aim for a different one in each dinner. The roster is in settings.
+- **Rotate cuisines.** No repeated cuisine profile within one week.
+- **Vary technique too.** Four skillet dinners in a row is a repeat even when the
+  ingredients differ. Mix searing, sheet pan, braising, and assembly.
+- **Do not repeat a full meal served in the last two weeks.** Hearted meals can come back
+  sooner.
 
 ---
 
 ## Fiber
 
-Fiber is a **first-class nutrient** — shown on every meal card. Preferred sources: legumes, whole grains, vegetables, seeds.
-
----
-
-## Macros
-
-```
-cal: 450–550
-protein: aim high
-fiber: shown on every card; higher is better
-carbs/fat: no specific targets
-```
-
----
-
-## Acid Reflux Rules
-
-These meals are planned with acid-reflux sensitivity in mind.
-
-**Rules:**
-1. **No stacking triggers within a single meal.** If a meal contains one trigger (e.g., tomato sauce), it should not also include another (e.g., fried component, heavy spice, citrus-based sauce, chocolate).
-2. **Maximum one potentially triggering meal per week.** Flag it clearly when it appears.
-3. Common triggers: tomato-heavy sauces, very spicy preparations, fried foods, citrus-based dressings or marinades, heavy garlic/onion loads, peppermint, chocolate.
-
-**Flag format:** *"⚠️ Contains tomato — acid-reflux flag. No other triggers in this meal."*
-
----
-
-## Meal Structure (Four Pillars)
-
-| Pillar | Description |
-|---|---|
-| `pro` | Protein + prep note |
-| `base` | Grain, starch, or bread |
-| `veg` | Vegetables |
-| `engine` | TJ's flavor anchor — always the **full Trader Joe's brand name** |
-
-**No duplicate engine or base within one week.**
-
----
-
-## Trader Joe's Engines
-
-Vary engines every meal. Check [traderjoes.com](https://www.traderjoes.com) and the [Fearless Flyer](https://www.traderjoes.com/home/ff) for new options. Prefer milder engines when you already need a flagged meal elsewhere in the week.
-
----
-
-## Week Validation Rules
-
-- [ ] 1 breakfast, 1 lunch, 2 dinners
-- [ ] ≥3 different protein types across the week
-- [ ] Different TJ's engine on every meal
-- [ ] No duplicate base across the week
-- [ ] All meals 450–550 kcal
-- [ ] Fiber shown on every meal card
-- [ ] No trigger stacking within any single meal
-- [ ] ≤1 flagged acid-reflux-risk meal per week
-- [ ] ≤1–2 fully frozen entrées
-- [ ] Breakfasts vary in style
-- [ ] Lunch is assemble-only
-- [ ] Cuisine profile varies within the week
-- [ ] No pineapple
+Fiber is a first-class macro — it shows on every ingredient and every meal card. Best
+sources: legumes, whole grains, vegetables, seeds. The floor is in settings; clearing it
+usually means adding beans or a second vegetable rather than a supplement.
 
 ---
 
 ## Avoid
 
 - Boring salads and bland proteins
-- Repetitive weeks (same base, cuisine, or engines)
-- Product-catalogue meals that feel like a TJ's ad
-- Pineapple, cherries, sugar snap peas, snow peas, frozen shredded hash browns
-- Trigger stacking
+- Recipes that are really three recipes
+- Product-catalogue meals that read like a store ad
+- Repeating a base, an engine, or a cuisine inside one week
+- Anything on the **never use** list in settings

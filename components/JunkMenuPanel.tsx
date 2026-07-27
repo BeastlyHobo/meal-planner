@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Heart, Loader2, Plus, Undo2, X } from "lucide-react";
 import { JUNK_CATEGORY_ORDER } from "@/lib/constants";
-import { stripTraderJoesForDisplay } from "@/lib/displayFormatters";
+import { stripStoreBrandForDisplay } from "@/lib/displayFormatters";
 import { useListMutations } from "@/lib/hooks/useListMutations";
 import { ListCategory } from "@/lib/types";
 import { sectionLabelMutedClass } from "@/lib/uiClasses";
@@ -116,7 +116,7 @@ export default function JunkMenuPanel({
               const pending = pendingHeartState[item.n];
               const liked = pending?.liked ?? baseLiked;
               const heartCount = pending?.heartCount ?? baseHeartCount;
-              const displayName = stripTraderJoesForDisplay(item.n);
+              const displayName = stripStoreBrandForDisplay(item.n);
 
               return (
                 <div key={item.n} className="flex items-center gap-3 py-2.5">
@@ -220,7 +220,7 @@ export default function JunkMenuPanel({
         <div className="fixed inset-x-0 bottom-[150px] z-40 mx-auto flex max-w-md items-center justify-between gap-3 px-4">
           <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-4 py-3 shadow-[var(--shadow-elevated)] backdrop-blur">
             <span className="min-w-0 truncate text-sm text-[var(--foreground)]">
-              Removed <strong className="font-semibold">{stripTraderJoesForDisplay(recentlyDeleted.name)}</strong>
+              Removed <strong className="font-semibold">{stripStoreBrandForDisplay(recentlyDeleted.name)}</strong>
             </span>
             <button
               type="button"

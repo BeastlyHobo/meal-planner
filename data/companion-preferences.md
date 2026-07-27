@@ -1,115 +1,103 @@
-# Companion Junk List — AI Planning Instructions
+# Junk List Preferences
 
-> Referenced by: `data/data_context.md`, `data/MEAL_PLAN_PRODUCTION_WORKFLOW.md`
+> Referenced by: `data/data_context.md`, `data/meal-plan-skill.md`, `data/MEAL_PLAN_PRODUCTION_WORKFLOW.md`
 
-Demo preferences for a secondary household shopper. The junk list is published alongside each week's meal plan: beer/wine, chips, a weekly sweet, quick frozen meals, a weekend frozen treat, biweekly coffee, weekly seasonal creamer, and flavored unsweetened sparkling water — with variety and a flyer-first mindset.
+The junk list rides along with each week's plan and flows onto the shopping list like
+everything else. It exists so the fun stuff is a deliberate, bounded choice instead of an
+impulse grab in the aisle.
 
----
+Junk items are routed by the same store rules as meal ingredients, so most land on the
+Sprouts list. Bulk snacks (a warehouse box of bars, a case of sparkling water) route to
+Costco on their own.
 
-## General Approach
-
-- **[Fearless Flyer](https://www.traderjoes.com/home/ff)** — always check first.
-- Prioritize what's new and interesting over repeating the same standbys.
-- Fill gaps with staples from the pools below when the flyer doesn't cover a category.
-- Vary week to week. Avoid repeating the exact same product two weeks in a row when practical.
-
----
-
-## Dislikes (avoid across all categories)
-
-- ❌ Licorice/anise/fennel flavor profile
-- ❌ Overly sweet dessert wines (ports, late-harvest styles)
-- ❌ Artificial-tasting diet/sugar-free sweets and snacks
-- ❌ Rosé wine
-- ❌ Mandarin Orange Chicken
-- ❌ Cauliflower Crust Pizza
-- ❌ Cowboy Caviar
+**Edit this file to match your household.** What follows is a starting point.
 
 ---
 
-## Categories & Rules
+## General approach
 
-Use these exact category strings, in this order:
+- Rotate. Avoid the exact same product two weeks running when you can.
+- One item per category is plenty. The list is a treat, not a second shop.
+- Seasonal and new-to-you beats the standby when both look good.
 
-1. Coffee/Creamer
-2. Beer/Wine
-3. Chips
-4. Sweets
-5. Frozen Food
-6. Frozen Treats
-7. Beverages/Drinks
+---
+
+## Categories
+
+Use these exact strings, in this order — the validator checks them:
+
+1. `Coffee/Creamer`
+2. `Beer/Wine`
+3. `Chips`
+4. `Sweets`
+5. `Frozen Food`
+6. `Frozen Treats`
+7. `Beverages/Drinks`
+
+A category may be empty (`"items": []`), but it must be present and in order.
 
 ---
 
 ### Coffee/Creamer
 
-- **Coffee:** Trader Joe's whole bean, **light roast**. Pantry item — **every other week** only.
-- **Creamer:** Always seasonal, always weekly. Favor sweet/dessert-y seasonal flavors. Never repeat the same creamer two weeks running if you can avoid it.
-
----
+Whole bean coffee comes from Costco monthly and lives on the staples list, so this
+category is usually just creamer. Rotate flavors; skip the weeks you still have some.
 
 ### Beer/Wine
 
-**Beer:** No wheat beers or hefeweizens. Lean toward Hazy IPAs and IPAs. Prefer seasonal picks; otherwise Boatswain IPA / Double IPA / Amber Ale, Stockyard Oatmeal Stout, or a solid lager 6-pack.
-
-**Wine:** No rosé or dessert wines. Weight toward reds, with white and sparkling for variety. Always 1 bottle.
-
----
+Beer: lean hazy IPA and IPA, a good lager in summer. Wine: weight toward reds, with a
+white or sparkling for variety. One bottle or one six-pack.
 
 ### Chips
 
-Rotate freely (1 bag). Example pool:
-
-- Quinoa & Black Bean Infused Tortilla Chips
-- Restaurant-Style Tortilla Chips
-- Peanut Butter Filled Pretzel Nuggets
-- Organic Elote Corn Chip Dippers
-- Sea Salted Saddle Potato Crisps
-- Ridge Cut Kettle Cooked Potato Chips
-- Ode to the Classic Potato Chip
-
-Flyer wildcards welcome.
-
----
+One bag. Rotate between tortilla, kettle, and pita styles rather than buying the same bag
+every week.
 
 ### Sweets
 
-Pick **1 item per week**. Mix chocolate and non-chocolate. Avoid licorice/anise/fennel and artificial diet sweets. Check the flyer before defaulting to the standing pool (PB cups, Joe-Joe's, Cookie Butter, Speculoos, Pound Plus, dried mango, mochi, etc.).
+One item. Mix chocolate and non-chocolate week to week.
 
----
+> The flax seed brownies are a **staple**, not a junk item — they are on the recurring
+> Sprouts list in `STAPLES_CATALOG` and do not need to be re-picked each week.
 
 ### Frozen Food
 
-Pick **1–2** quick heat-and-eat Mexican or Indian frozen meals. Lean Mexican more often than not; still mix in Indian. No Mandarin Orange Chicken or Cauliflower Crust Pizza.
-
----
+One or two quick heat-and-eat meals for the night that gets away from you. This is the
+release valve that keeps a bad Tuesday from becoming takeout.
 
 ### Frozen Treats
 
-Pick 1 weekend item. Default to **savory** (bulgogi, pulled pork, spinach artichoke dip, mac & cheese with pepperoni); dessert is an occasional swap.
-
----
+One weekend item. Ice cream, sorbet, mochi, or a savory frozen snack.
 
 ### Beverages/Drinks
 
-Default: flavored, unsweetened sparkling water in cans. Avoid diet/artificially sweetened sodas. Rotate flavors week to week.
+Flavored unsweetened sparkling water by default. Rotate flavors.
 
 ---
 
-## Output Format
+## Dislikes
+
+Keep a running list here so the same rejected item does not come back:
+
+- (add yours — e.g. licorice/anise flavors, artificially sweetened snacks, rosé)
+
+---
+
+## Output format
 
 ```json
 {
   "junkList": [
-    { "category": "Coffee/Creamer", "items": [...] },
-    { "category": "Beer/Wine", "items": [...] },
-    { "category": "Chips", "items": [...] },
-    { "category": "Sweets", "items": [...] },
-    { "category": "Frozen Food", "items": [...] },
-    { "category": "Frozen Treats", "items": [...] },
-    { "category": "Beverages/Drinks", "items": [...] }
+    { "category": "Coffee/Creamer", "items": [{ "n": "Oat milk creamer", "q": "1 carton" }] },
+    { "category": "Beer/Wine", "items": [] },
+    { "category": "Chips", "items": [] },
+    { "category": "Sweets", "items": [] },
+    { "category": "Frozen Food", "items": [] },
+    { "category": "Frozen Treats", "items": [] },
+    { "category": "Beverages/Drinks", "items": [] }
   ]
 }
 ```
 
-Each item: `{ "n": "full TJ's product name", "q": "quantity" }`
+Each item is `{ "n": "product name", "q": "quantity" }`. Add `"store": "costco"` to force
+an item onto the warehouse list.

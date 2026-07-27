@@ -10,7 +10,8 @@ import {
   MealInput,
   MealRow,
   MealFeedbackRow,
-  MealPlanMealRow
+  MealPlanMealRow,
+  Recipe
 } from "@/lib/types";
 
 function toNumber(value: number | string): number {
@@ -41,6 +42,43 @@ function normalizeIngredients(value: unknown): MealIngredient[] {
   });
 }
 
+/**
+ * Accept a recipe only if it has the shape the UI renders: a non-empty ordered list of
+ * steps plus numeric timing. Partial or malformed JSON is dropped rather than half-shown.
+ */
+function normalizeRecipe(value: unknown): Recipe | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = value as Partial<Recipe>;
+  const steps = Array.isArray(candidate.steps)
+    ? candidate.steps.filter((step): step is string => typeof step === "string" && step.trim().length > 0)
+    : [];
+
+  if (steps.length === 0) {
+    return undefined;
+  }
+
+  const toCount = (input: unknown, fallback: number) =>
+    typeof input === "number" && Number.isFinite(input) && input >= 0 ? Math.round(input) : fallback;
+
+  const equipment = Array.isArray(candidate.equipment)
+    ? candidate.equipment.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : undefined;
+
+  return {
+    servings: toCount(candidate.servings, 4),
+    prepMinutes: toCount(candidate.prepMinutes, 0),
+    cookMinutes: toCount(candidate.cookMinutes, 0),
+    ...(equipment?.length ? { equipment } : {}),
+    steps,
+    ...(typeof candidate.notes === "string" && candidate.notes.trim()
+      ? { notes: candidate.notes.trim() }
+      : {}),
+  };
+}
+
 export function mapMeal(
   row: MealRow,
   likedForCurrentWeek = false,
@@ -58,6 +96,7 @@ export function mapMeal(
       engine: row.engine,
     },
     ingredients: normalizeIngredients(row.ingredients),
+    recipe: normalizeRecipe(row.recipe),
     macros: {
       cal: row.calories,
       p: row.protein_grams,
@@ -95,6 +134,7 @@ export function toMealInput(meal: StoredMeal): MealInput {
     name: meal.name,
     build: meal.build,
     ingredients: meal.ingredients,
+    recipe: meal.recipe,
     macros: meal.macros,
   };
 }
@@ -133,6 +173,7 @@ export function mealInputToRow(mealInput: MealInput): Omit<MealRow, 'id' | 'crea
     veg: mealInput.build.veg,
     engine: mealInput.build.engine,
     ingredients: mealInput.ingredients ?? [],
+    recipe: mealInput.recipe ?? null,
     calories: mealInput.macros.cal,
     protein_grams: mealInput.macros.p,
     carbs_grams: mealInput.macros.c,
@@ -144,11 +185,11 @@ export function mealInputToRow(mealInput: MealInput): Omit<MealRow, 'id' | 'crea
 export function serializePlanData(weekData: {
   shoppingList: unknown;
   junkList: unknown;
-  householdGoods?: unknown;
+  staples?: unknown;
 }) {
   return {
     shoppingList: weekData.shoppingList,
     junkList: weekData.junkList,
-    householdGoods: weekData.householdGoods ?? [],
+    staples: weekData.staples ?? [],
   };
 }

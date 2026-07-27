@@ -2,19 +2,17 @@ import fs from "fs";
 import { deriveShoppingListFromMeals } from "@/lib/domain/shoppingListDerivation";
 import { extractWeekDataFromMarkdown } from "@/lib/mealPlanMarkdown";
 import { classifyShoppingItem } from "@/lib/shoppingListOrder";
-import { ListCategory, Macros, MealInput, WeekData } from "@/lib/types";
+import { STORES } from "@/lib/stores";
+import { ListCategory, Macros, MealInput, MealType, WeekData } from "@/lib/types";
+import {
+  DEFAULT_SETTINGS,
+  HouseholdSettings,
+  totalMealsForWeekShape,
+} from "@/lib/settings";
 
-import { EXPECTED_MEAL_COUNTS } from "@/lib/constants";
+import { JUNK_CATEGORY_ORDER, MEAL_TYPES } from "@/lib/constants";
 
-const REQUIRED_JUNK_CATEGORIES = [
-  "Coffee/Creamer",
-  "Beer/Wine",
-  "Chips",
-  "Sweets",
-  "Frozen Food",
-  "Frozen Treats",
-  "Beverages/Drinks",
-];
+const REQUIRED_JUNK_CATEGORIES: readonly string[] = JUNK_CATEGORY_ORDER;
 
 const MACRO_KEYS = ["cal", "p", "c", "f", "fiber"] as const;
 
@@ -22,6 +20,11 @@ export interface MealPlanValidationOptions {
   printShoppingOrder?: boolean;
   allowShoppingFallbacks?: boolean;
   macroTolerance?: number;
+  /**
+   * Household settings to validate against. Defaults to DEFAULT_SETTINGS so the
+   * validator runs offline, with no database.
+   */
+  settings?: HouseholdSettings;
 }
 
 export interface MealPlanValidationResult {
@@ -40,26 +43,34 @@ export function validateMealPlanFile(
   const errors: string[] = [];
   const warnings: string[] = [];
   const macroTolerance = options.macroTolerance ?? 1;
+  const settings = options.settings ?? DEFAULT_SETTINGS;
 
   try {
     const content = fs.readFileSync(filepath, "utf8");
     const rawWeekData = parseRawWeekData(content);
     const weekData = extractWeekDataFromMarkdown(content);
 
-    validateMealCounts(weekData, errors);
+    validateMealCounts(weekData, settings, errors);
     validateFiberPresence(rawWeekData, errors);
     validateIngredientMacroTotals(weekData, macroTolerance, errors);
     validateUniqueBuildValues(weekData, "base", errors);
     validateUniqueBuildValues(weekData, "engine", errors);
     validateJunkCategories(weekData, errors);
+    validateRecipes(weekData, settings, errors, warnings);
+    validateDietaryTargets(weekData, settings, warnings);
 
     const shoppingList = deriveShoppingListFromMeals(
       weekData.meals,
       [],
       weekData.junkList,
-      weekData.householdGoods ?? []
+      weekData.staples ?? []
     );
-    validateShoppingClassifications(shoppingList, errors, warnings, Boolean(options.allowShoppingFallbacks));
+    validateShoppingClassifications(
+      shoppingList,
+      errors,
+      warnings,
+      Boolean(options.allowShoppingFallbacks)
+    );
 
     if (options.printShoppingOrder) {
       printShoppingOrder(shoppingList);
@@ -108,20 +119,25 @@ function parseRawWeekData(markdown: string): WeekData {
   return JSON.parse(match[1]) as WeekData;
 }
 
-function validateMealCounts(weekData: WeekData, errors: string[]) {
-  const counts = weekData.meals.reduce<Record<string, number>>((acc, meal) => {
+function validateMealCounts(
+  weekData: WeekData,
+  settings: HouseholdSettings,
+  errors: string[]
+) {
+  const counts = weekData.meals.reduce<Partial<Record<MealType, number>>>((acc, meal) => {
     acc[meal.type] = (acc[meal.type] ?? 0) + 1;
     return acc;
   }, {});
 
-  for (const [type, want] of Object.entries(EXPECTED_MEAL_COUNTS)) {
+  for (const type of MEAL_TYPES) {
+    const want = settings.weekShape[type] ?? 0;
     const got = counts[type] ?? 0;
     if (got !== want) {
       errors.push(`Expected ${want} ${type}(s), found ${got}.`);
     }
   }
 
-  const totalExpected = Object.values(EXPECTED_MEAL_COUNTS).reduce((sum, count) => sum + count, 0);
+  const totalExpected = totalMealsForWeekShape(settings.weekShape);
   if (weekData.meals.length !== totalExpected) {
     errors.push(`Expected ${totalExpected} total meals, found ${weekData.meals.length}.`);
   }
@@ -157,6 +173,115 @@ function validateIngredientMacroTotals(weekData: WeekData, tolerance: number, er
         errors.push(
           `meals[${mealIndex}] "${meal.name}" ${macroKey} total mismatch: ingredients=${round(ingredientTotals[macroKey])}, meal=${meal.macros[macroKey]}.`
         );
+      }
+    }
+  });
+}
+
+/**
+ * Dinners are the meals you cook, so they must carry a recipe. Other meal types may.
+ *
+ * Timing and yield are checked against settings as warnings, not errors: a 45-minute
+ * braise against a 40-minute ceiling is a judgment call, not a broken week.
+ */
+function validateRecipes(
+  weekData: WeekData,
+  settings: HouseholdSettings,
+  errors: string[],
+  warnings: string[]
+) {
+  weekData.meals.forEach((meal, mealIndex) => {
+    const label = `meals[${mealIndex}] "${meal.name}"`;
+    const recipe = meal.recipe;
+
+    if (!recipe) {
+      if (meal.type === "Dinner") {
+        errors.push(`${label} is a Dinner and must include a recipe with steps.`);
+      }
+      return;
+    }
+
+    if (!Array.isArray(recipe.steps) || recipe.steps.length === 0) {
+      errors.push(`${label} has a recipe with no steps.`);
+      return;
+    }
+
+    if (recipe.steps.some((step) => typeof step !== "string" || !step.trim())) {
+      errors.push(`${label} has an empty recipe step.`);
+    }
+
+    if (!Number.isFinite(recipe.servings) || recipe.servings < 1) {
+      errors.push(`${label} recipe.servings must be at least 1.`);
+    }
+
+    const totalMinutes = (recipe.prepMinutes ?? 0) + (recipe.cookMinutes ?? 0);
+    if (totalMinutes > settings.dietary.maxCookMinutes) {
+      warnings.push(
+        `${label} takes ${totalMinutes} min, over the ${settings.dietary.maxCookMinutes} min ceiling.`
+      );
+    }
+
+    if (meal.type === "Dinner" && recipe.servings < settings.dietary.servingsPerDinner) {
+      warnings.push(
+        `${label} serves ${recipe.servings}, under the target of ${settings.dietary.servingsPerDinner}.`
+      );
+    }
+  });
+}
+
+/** Soft checks. These describe the week; they do not gate publishing. */
+function validateDietaryTargets(
+  weekData: WeekData,
+  settings: HouseholdSettings,
+  warnings: string[]
+) {
+  const { dietary } = settings;
+
+  weekData.meals.forEach((meal, mealIndex) => {
+    const label = `meals[${mealIndex}] "${meal.name}"`;
+
+    if (
+      meal.macros.cal < dietary.caloriesPerMealMin ||
+      meal.macros.cal > dietary.caloriesPerMealMax
+    ) {
+      warnings.push(
+        `${label} is ${meal.macros.cal} cal, outside ${dietary.caloriesPerMealMin}–${dietary.caloriesPerMealMax}.`
+      );
+    }
+
+    if (meal.macros.p < dietary.proteinFloorGrams) {
+      warnings.push(
+        `${label} has ${meal.macros.p}g protein, under the ${dietary.proteinFloorGrams}g floor.`
+      );
+    }
+
+    if (meal.macros.fiber < dietary.fiberFloorGrams) {
+      warnings.push(
+        `${label} has ${meal.macros.fiber}g fiber, under the ${dietary.fiberFloorGrams}g floor.`
+      );
+    }
+  });
+
+  if (dietary.avoid.length === 0) {
+    return;
+  }
+
+  const avoidTerms = dietary.avoid.map((term) => term.toLowerCase());
+  weekData.meals.forEach((meal, mealIndex) => {
+    const haystack = [
+      meal.name,
+      ...(meal.ingredients?.map((ingredient) => ingredient.name) ?? []),
+      ...meal.build.pro,
+      ...meal.build.base,
+      ...meal.build.veg,
+      ...meal.build.engine,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    for (const term of avoidTerms) {
+      if (haystack.includes(term)) {
+        warnings.push(`meals[${mealIndex}] "${meal.name}" contains an avoided item: ${term}.`);
       }
     }
   });
@@ -212,7 +337,7 @@ function validateShoppingClassifications(
       .map((item) => ({
         category: category.category,
         itemName: item.n,
-        classification: classifyShoppingItem(item.n),
+        classification: classifyShoppingItem(item.n, item.store ?? category.store),
       }))
       .filter(({ classification }) => classification.confidence === "fallback")
   );
@@ -233,9 +358,16 @@ function validateShoppingClassifications(
 }
 
 function printShoppingOrder(shoppingList: ListCategory[]) {
-  console.log("🛒 Derived Trader Joe's shopping order:");
-  for (const category of shoppingList) {
-    console.log(`  ${category.category}: ${category.items.map((item) => item.n).join(", ")}`);
+  for (const store of STORES) {
+    const sections = shoppingList.filter((category) => category.store === store.key);
+    if (sections.length === 0) {
+      continue;
+    }
+
+    console.log(`🛒 ${store.name} — ${store.cadenceLabel}:`);
+    for (const category of sections) {
+      console.log(`  ${category.category}: ${category.items.map((item) => item.n).join(", ")}`);
+    }
   }
 }
 

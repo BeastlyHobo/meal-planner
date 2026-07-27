@@ -1,8 +1,9 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import { MealIngredient, StoredMeal } from "@/lib/types";
 import { cardInteractiveClass } from "@/lib/uiClasses";
-import { stripTraderJoesForDisplay } from "@/lib/displayFormatters";
+import { stripStoreBrandForDisplay } from "@/lib/displayFormatters";
 
 export default function MealCardView({
   meal,
@@ -49,7 +50,9 @@ export function MealCardBody({
 
   return (
     <>
-      <div className={`${compact ? "mt-3" : "mt-4"} flex flex-wrap gap-2`}>
+      <RecipeTimeBadge meal={meal} compact={compact} />
+
+      <div className={`${compact ? "mt-2.5" : "mt-3"} flex flex-wrap gap-2`}>
         {buildLabels.map((item, idx) => {
           return (
             <span
@@ -60,7 +63,7 @@ export function MealCardBody({
               }`}
             >
               <IngredientGlyph category={item.category} />
-              <span>{stripTraderJoesForDisplay(item.value)}</span>
+              <span>{stripStoreBrandForDisplay(item.value)}</span>
               {item.quantity ? (
                 <span className="rounded-full bg-[var(--tint-stone)] px-1.5 py-0.5 text-[9px] font-bold tracking-[0.04em] text-[var(--text-muted)]">
                   {item.quantity}
@@ -73,6 +76,24 @@ export function MealCardBody({
 
       <MacroRow meal={meal} />
     </>
+  );
+}
+
+/** Total time and yield, so you can pick tonight's dinner off the menu at a glance. */
+function RecipeTimeBadge({ meal, compact }: { meal: StoredMeal; compact: boolean }) {
+  if (!meal.recipe) {
+    return null;
+  }
+
+  const totalMinutes = meal.recipe.prepMinutes + meal.recipe.cookMinutes;
+
+  return (
+    <div className={compact ? "mt-2.5" : "mt-3"}>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-stone)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-text)] dark:bg-[var(--surface-2)]">
+        <Clock size={11} />
+        {totalMinutes} min · serves {meal.recipe.servings}
+      </span>
+    </div>
   );
 }
 

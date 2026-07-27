@@ -6,8 +6,9 @@ import {
 } from "@/lib/services/mealPlanService";
 import { ApiError, createRouteHandler } from "@/lib/apiUtils";
 import { requireString } from "@/lib/routeValidation";
-import { getItemStoreZone, organizeShoppingListForStoreLayout } from "@/lib/shoppingListOrder";
-import type { ListCategory, StoredMealPlan } from "@/lib/types";
+import { classifyShoppingItem, organizeShoppingListForStoreLayout } from "@/lib/shoppingListOrder";
+import { isStoreKey } from "@/lib/stores";
+import type { ListCategory, StoreKey, StoredMealPlan } from "@/lib/types";
 
 async function saveShoppingList(
   mealPlan: StoredMealPlan,
@@ -22,7 +23,7 @@ async function saveShoppingList(
   return updateMealPlanLists(mealPlan.id, {
     shoppingList: organizedShoppingList,
     junkList: mealPlan.junkList,
-    householdGoods: mealPlan.householdGoods ?? [],
+    staples: mealPlan.staples ?? [],
     source: "user_edit",
     generationContext: {
       updatedFrom,
@@ -31,12 +32,21 @@ async function saveShoppingList(
   });
 }
 
+/**
+ * Locate an item by its section, then by name anywhere in the list.
+ *
+ * The name-only fallback matters because re-deriving can move an item to a different
+ * aisle (or a different store) between the client rendering it and the request landing.
+ */
 function findShoppingItemIndex(
   shoppingList: ListCategory[],
   category: string,
-  itemName: string
+  itemName: string,
+  store?: StoreKey
 ): { categoryIndex: number; itemIndex: number } | null {
-  const categoryIndex = shoppingList.findIndex((c) => c.category === category);
+  const categoryIndex = shoppingList.findIndex(
+    (c) => c.category === category && (store === undefined || c.store === store)
+  );
   if (categoryIndex !== -1) {
     const itemIndex = shoppingList[categoryIndex].items.findIndex((item) => item.n === itemName);
     if (itemIndex !== -1) {
@@ -68,17 +78,24 @@ export const POST = createRouteHandler(async (request: NextRequest) => {
     throw new ApiError("Meal plan not found", 404);
   }
 
-    // Find or create the persisted store-zone category for the item.
+    // Find or create the persisted store-zone section for the item. Zone names repeat
+    // across stores ("Frozen" exists in both), so a section matches only when the store
+    // matches too.
     const shoppingList = [...mealPlan.shoppingList];
-    const itemStoreZone = getItemStoreZone(itemName);
-    let categoryIndex = shoppingList.findIndex(c => c.category === itemStoreZone);
+    const classification = classifyShoppingItem(itemName);
+    let categoryIndex = shoppingList.findIndex(
+      (c) => c.category === classification.zone && c.store === classification.store
+    );
     if (categoryIndex === -1) {
-      categoryIndex = shoppingList.findIndex(c => c.category === category);
+      categoryIndex = shoppingList.findIndex(
+        (c) => c.category === category && c.store === classification.store
+      );
     }
-    
+
     if (categoryIndex === -1) {
       shoppingList.push({
-        category: itemStoreZone,
+        category: classification.zone,
+        store: classification.store,
         items: []
       });
       categoryIndex = shoppingList.length - 1;
@@ -87,6 +104,7 @@ export const POST = createRouteHandler(async (request: NextRequest) => {
     // Add item
     shoppingList[categoryIndex].items.push({
       n: itemName,
+      store: classification.store,
       ...(itemQty ? { q: itemQty } : {}),
     });
 
@@ -121,6 +139,7 @@ export const DELETE = createRouteHandler(async (request: NextRequest) => {
   const weekRange = typeof obj.weekRange === "string" ? obj.weekRange : null;
   const category = requireString(obj.category, "category");
   const itemName = requireString(obj.itemName, "itemName");
+  const store = isStoreKey(obj.store) ? obj.store : undefined;
 
   const mealPlan = weekRange ? await getMealPlanByWeekRange(weekRange) : await getLatestMealPlan();
   if (!mealPlan) {
@@ -128,7 +147,7 @@ export const DELETE = createRouteHandler(async (request: NextRequest) => {
   }
 
     const shoppingList = [...mealPlan.shoppingList];
-    const target = findShoppingItemIndex(shoppingList, category, itemName);
+    const target = findShoppingItemIndex(shoppingList, category, itemName, store);
     
     if (target) {
       shoppingList[target.categoryIndex].items = shoppingList[target.categoryIndex].items.filter(
@@ -155,6 +174,7 @@ export const PATCH = createRouteHandler(async (request: NextRequest) => {
   const itemName = requireString(obj.itemName, "itemName");
   const pantry = typeof obj.pantry === "boolean" ? obj.pantry : undefined;
   const checked = typeof obj.checked === "boolean" ? obj.checked : undefined;
+  const store = isStoreKey(obj.store) ? obj.store : undefined;
   if (pantry === undefined && checked === undefined) {
     throw new ApiError("pantry or checked is required", 400);
   }
@@ -165,7 +185,7 @@ export const PATCH = createRouteHandler(async (request: NextRequest) => {
   }
 
     const shoppingList = [...mealPlan.shoppingList];
-    const target = findShoppingItemIndex(shoppingList, category, itemName);
+    const target = findShoppingItemIndex(shoppingList, category, itemName, store);
     
     if (!target) {
       throw new ApiError("Item not found", 404);

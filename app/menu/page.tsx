@@ -2,27 +2,22 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { Loader2, Plus, Home } from "lucide-react";
+import { Loader2, Plus, ShoppingBasket } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import JunkMenuPanel from "@/components/JunkMenuPanel";
-import HouseholdGoodsPanel from "@/components/HouseholdGoodsPanel";
+import StaplesPanel from "@/components/StaplesPanel";
 import MenuMealCard from "@/components/MenuMealCard";
 import MealPlanGate from "@/components/MealPlanGate";
 import MealSwapPickerModal from "@/components/MealSwapPickerModal";
 import { MEAL_TYPES } from "@/lib/constants";
+import { useSettings } from "@/lib/hooks/useSettings";
 import { useMealPlanMutations } from "@/lib/hooks/useMealPlanMutations";
 import { useMealPlan } from "@/lib/MealPlanProvider";
-import { ListCategory, MealType, StoredMeal, HouseholdGoodsItem } from "@/lib/types";
+import { ListCategory, MealType, StoredMeal, StapleItem } from "@/lib/types";
 import { sectionLabelColorClass } from "@/lib/uiClasses";
 import { buildHref } from "@/lib/urlState";
 
-const MENU_GROUPS: { type: MealType; label: string }[] = [
-  { type: "Breakfast", label: "Breakfasts" },
-  { type: "Lunch", label: "Lunches" },
-  { type: "Dinner", label: "Dinners" },
-];
-
-type MenuTab = MealType | "Junk" | "Household";
+type MenuTab = MealType | "Junk" | "Staples";
 type MenuGroup = { type: MealType; label: string; meals: StoredMeal[] };
 type MenuTabOption = { type: MenuTab; label: string; iconOnly?: boolean };
 
@@ -34,14 +29,14 @@ type PickerTarget = {
 };
 
 function parseMenuTab(raw: string | null): MenuTab | null {
-  if (raw === "Junk" || raw === "Household") return raw;
+  if (raw === "Junk" || raw === "Staples") return raw;
   return MEAL_TYPES.includes(raw as MealType) ? (raw as MealType) : null;
 }
 
 function MenuContent({
   groups,
   junkList,
-  householdGoods,
+  staples,
   weekRange,
   mealPlanId,
   queryString,
@@ -55,7 +50,7 @@ function MenuContent({
 }: {
   groups: MenuGroup[];
   junkList: ListCategory[];
-  householdGoods: HouseholdGoodsItem[];
+  staples: StapleItem[];
   weekRange?: string;
   mealPlanId?: number;
   queryString: string;
@@ -72,11 +67,11 @@ function MenuContent({
   const tabFromUrl = parseMenuTab(searchParams.get("type"));
   const tabs: MenuTabOption[] = useMemo(
     () => [
-      ...MENU_GROUPS.map((group) => ({ type: group.type, label: group.type })),
+      ...groups.map((group) => ({ type: group.type, label: group.type })),
       { type: "Junk", label: "Junk" },
-      { type: "Household", label: "Household", iconOnly: true },
+      { type: "Staples", label: "Staples", iconOnly: true },
     ],
-    []
+    [groups]
   );
 
   const activeTab =
@@ -139,14 +134,14 @@ function MenuContent({
               activeTab === tab.type
                 ? tab.type === "Junk"
                   ? "bg-harvest-purple text-white shadow dark:bg-[var(--surface-3)] dark:text-harvest-purple dark:shadow-none"
-                  : tab.type === "Household"
+                  : tab.type === "Staples"
                     ? "bg-[var(--text-muted)] text-white shadow dark:bg-[var(--surface-3)] dark:text-[var(--foreground)] dark:shadow-none"
                     : "bg-harvest-green text-white shadow dark:bg-[var(--surface-3)] dark:text-harvest-green dark:shadow-none"
                 : "bg-[var(--card-border)] text-[var(--muted-text)]"
             }`}
-            aria-label={tab.iconOnly ? "Household goods" : undefined}
+            aria-label={tab.iconOnly ? "Staples" : undefined}
           >
-            {tab.iconOnly ? <Home size={14} strokeWidth={2.5} /> : tab.label}
+            {tab.iconOnly ? <ShoppingBasket size={14} strokeWidth={2.5} /> : tab.label}
           </Link>
         ))}
       </div>
@@ -159,9 +154,9 @@ function MenuContent({
             mealPlanId={mealPlanId}
             onUpdate={onUpdate}
           />
-        ) : activeTab === "Household" ? (
-          <HouseholdGoodsPanel
-            data={householdGoods}
+        ) : activeTab === "Staples" ? (
+          <StaplesPanel
+            data={staples}
             weekRange={weekRange}
             onUpdate={onUpdate}
           />
@@ -206,6 +201,7 @@ function MenuContent({
 
 export default function MenuPage() {
   const { plan, isLoading, error, refresh } = useMealPlan();
+  const { settings } = useSettings();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryString = useMemo(() => searchParams.toString(), [searchParams]);
@@ -276,12 +272,17 @@ export default function MenuPage() {
       onSeeded={refresh}
     >
       {(readyPlan) => {
-        const groups = MENU_GROUPS.map((group) => ({
-          ...group,
+        // Show a meal-type tab when the week shape asks for it or the week already has
+        // one, so a 4-dinner household never sees empty Breakfast and Lunch tabs.
+        const groups = MEAL_TYPES.map((type) => ({
+          type,
+          label: `${type}s`,
           meals: readyPlan.meals
-            .filter((meal) => meal.type === group.type)
+            .filter((meal) => meal.type === type)
             .sort((a, b) => a.slotOrder - b.slotOrder),
-        }));
+        })).filter(
+          (group) => group.meals.length > 0 || (settings.weekShape[group.type] ?? 0) > 0
+        );
 
         const weekMealIds = readyPlan.meals.map((meal) => meal.mealId);
 
@@ -292,7 +293,7 @@ export default function MenuPage() {
             <MenuContent
               groups={groups}
               junkList={readyPlan.junkList}
-              householdGoods={readyPlan.householdGoods}
+              staples={readyPlan.staples}
               weekRange={readyPlan.weekRange}
               mealPlanId={readyPlan.id}
               queryString={queryString}

@@ -1,22 +1,30 @@
 # Harvest
 
-**A Trader Joe's–first meal planner that solves the question "What's for dinner?"**
+**A two-store meal planner that solves the question "What's for dinner?"**
 
-My wife and I shop at Trader Joe's every week. I used to do the shopping and I'd reach for my favorites like steak, spaghetti bolognese, burgers, nachos, with an occasional healthier option like salmon thrown in. On top of that, we go out to eat fairly often, so we weren't eating healthy enough. We also got bored of everything we made — pizzas, curries, fried rice — we'd cycle through phases of eating something, getting sick of it, and going out a lot instead. I wanted to meet my wife's need for an ever-changing variety of healthy, home-cooked meals from ingredients at Trader Joe's.
+We shop Sprouts about twice a week and Costco about once a month. Costco is where the
+meat, the freezer stock, and the paper goods come from. Sprouts is where everything fresh
+comes from — and honestly we buy roughly the same thing every time: turkey for sandwiches,
+cheese, lettuce, flax seed brownies.
 
-With that in mind, I figured I'd use Claude or similar to meal plan for us, but I quickly realized I wanted a scaffold around it. I thought about just building skills, but realized Cursor could build the frontend in like an hour. Once I had it built, customizing it for our exact preferences and our Trader Joe's layout was easy. After a couple rounds of shopping to work out the kinks, my wife now does the shopping and I make dinner. I can honestly say this app has done more to reduce stress in my marriage than anything else we've tried. We always know there's a healthy, easy dinner option in the fridge.
+So breakfast and lunch were solved. **Dinner was not.** That's the part that turns into
+"I don't know, what do you want?" at 6pm, which turns into going out.
 
-We've tried a ton of configurations, but what we settled on is 1 breakfast, 1 lunch, and 2 dinners, plus a section for household items and a section for junk food. Every week I launch an agent (I'm sure you could automate this) that reads the Fearless Flyer, builds a meal plan that meets our dietary restrictions and protein/fiber needs, and puts it in a shopping list ordered to match our store's layout. The main pitfalls: forcing a rigid schedule, and planning too many meals. Each breakfast/lunch gets 3-5 servings, plus 2 dinners plus leftovers — that's plenty for a week. The only other thing to mention is that there are no recipes, just ingredients for a meal. I'm a good cooks so this is plenty for me. I'll grill, fry bake and broil based on what I want that day. But now whatever I make is meeting all of our health and dietary needs every time I cook.
+Harvest plans the dinners. It gives each one a real recipe with numbered steps, derives a
+shopping list from the ingredients, and splits that list into a weekly Sprouts run and a
+monthly Costco run — each ordered the way you actually walk that store. The staples you
+never re-decide ride along automatically.
 
-A year ago I could never have built anything like this. Now my marriage is a little lighter, because dinner stopped being one more thing we had to figure out every day.
-
-Repo: https://github.com/SGShuman/tjs-meal-planner.git
+> This is a fork of [tjs-meal-planner](https://github.com/SGShuman/tjs-meal-planner),
+> which was built around a single weekly Trader Joe's trip. The original idea, and the
+> week-as-markdown authoring flow, are theirs.
 
 ![Harvest menu on mobile](docs/menu.png)
 
 <p align="center">
   <a href="#quick-start"><strong>Quick start</strong></a> ·
   <a href="#what-you-get">Features</a> ·
+  <a href="#making-it-yours">Make it yours</a> ·
   <a href="#authoring-a-week">Author a week</a> ·
   <a href="#project-layout">Layout</a> ·
   <a href="#license">License</a>
@@ -26,25 +34,33 @@ Repo: https://github.com/SGShuman/tjs-meal-planner.git
 
 ## Why Harvest
 
-Most meal apps optimize for recipes. Harvest optimizes for **one weekly shop at Trader Joe's**:
+Most meal apps optimize for recipes. Harvest optimizes for **how you actually shop**:
 
-- A flat menu of **1 breakfast, 1 lunch, and 2 dinners** (no day grid to babysit)
-- Macros that matter in practice — **calories, protein, carbs, fat, and fiber**
-- A shopping list ordered for how you actually walk the store
-- A companion “junk” list and household goods list beside the meals
-- Hearts, swaps, and an explore library so good meals come back
+- **Two stores, two rhythms.** A weekly fresh run and a monthly bulk run, each with its
+  own walking order. Meat routes to the warehouse list; produce routes to the weekly one.
+- **Recurring staples.** The turkey, cheese, lettuce, and paper towels you buy every time
+  are configured once and appear on every list.
+- **Dinners with recipes.** Numbered steps, prep and cook time, servings, and equipment —
+  on the meal card and the detail page.
+- **A flat menu, no day grid.** Four dinners a week; you decide on Tuesday what Tuesday is.
+- **Macros that matter in practice** — calories, protein, carbs, fat, and fiber.
+- **Your rules, in the app.** Week shape and dietary targets live at `/settings`, not in
+  someone else's config file.
 
-It also ships with markdown + JSON tooling so you (or an AI assistant) can draft a week, validate it, and publish it into the live app.
+It also ships with markdown + JSON tooling so you (or an AI assistant) can draft a week,
+validate it, and publish it into the live app.
 
-> **Note:** Trader Joe's is a trademark of its respective owner. This project is independent and not affiliated with, endorsed by, or sponsored by Trader Joe's.
+> **Note:** Sprouts and Costco are trademarks of their respective owners. This project is
+> independent and not affiliated with, endorsed by, or sponsored by either.
 
 ## What you get
 
 | Surface | What it does |
 |---|---|
-| **Menu** (`/menu`) | The week’s meals by type, plus Junk and Household tabs |
-| **Shop** (`/shop`) | Derived shopping list in store walking order |
+| **Menu** (`/menu`) | The week's meals by type, plus Junk and Staples tabs |
+| **Shop** (`/shop`) | Derived shopping list, split into Sprouts and Costco tabs in store walking order |
 | **Explore** (`/explore`) | Searchable meal library with hearts and history |
+| **Settings** (`/settings`) | Week shape and dietary rules |
 | **Offline-friendly** | Service worker keeps the current week usable in-store |
 
 Under the hood: Next.js App Router, React, TypeScript, Tailwind, PostgreSQL, Docker.
@@ -56,17 +72,16 @@ Under the hood: Next.js App Router, React, TypeScript, Tailwind, PostgreSQL, Doc
 
 ## Quick start
 
-The happy path: one Compose file, one browser tab.
-
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/<you>/harvest.git
-cd harvest
+git clone https://github.com/<you>/meal-planner.git
+cd meal-planner
 cp .env.example .env
 ```
 
-Edit `.env` and set a real `POSTGRES_PASSWORD` (the production Compose file will refuse to start without it).
+Edit `.env` and set a real `POSTGRES_PASSWORD` (the production Compose file will refuse to
+start without it).
 
 ### 2. Start the app
 
@@ -76,11 +91,10 @@ docker compose up -d --build
 
 Open **[http://localhost:3000](http://localhost:3000)** — it redirects to `/menu`.
 
-Postgres stays on the Docker network (not exposed on the host). The app listens on port `3000`.
+Postgres stays on the Docker network (not exposed on the host). The app listens on port
+`3000`.
 
 ### 3. Load the sample week
-
-With the stack up, seed from the baked-in sample plan:
 
 ```bash
 curl -X POST http://localhost:3000/api/mealplan/seed
@@ -88,7 +102,7 @@ curl -X POST http://localhost:3000/api/mealplan/seed
 
 Or use the **Seed plan** control in the UI when no week is loaded yet.
 
-You should see a full Menu with meals, macros, and shopping data.
+You should see four dinners with recipes, and a Shop screen with Sprouts and Costco tabs.
 
 ### Stop / reset
 
@@ -98,8 +112,6 @@ docker compose down -v       # also wipe the Postgres volume
 ```
 
 ## Development stack (hot reload)
-
-For day-to-day UI work, use the dev Compose file. It mounts the repo, runs `next dev`, and publishes Postgres on `localhost:5432` so host scripts can talk to the DB.
 
 ```bash
 cp .env.example .env   # DATABASE_URL already points at localhost
@@ -115,37 +127,72 @@ npm run lint
 npm run test:meal-plan-tools
 ```
 
-## Using the app
+## Making it yours
 
-1. **Menu** — browse Breakfast / Lunch / Dinner; heart, swap, or remove meals; add from the library.
-2. **Junk / Household tabs** — manage the companion snack list and household staples for the week.
-3. **Shop** — check items off while you walk the store (works better after a visit so the service worker can cache the week).
-4. **Explore** — find past meals by type, protein, or search; open a meal for full ingredient + macro detail.
+This is the part worth doing before your first real week.
+
+### 1. Your store layouts
+
+`lib/stores/sprouts.ts` and `lib/stores/costco.ts` each export a zone array — the order
+you physically walk that store. Reorder it to match yours and the Shop screen follows
+immediately. The keyword rules below each array decide which aisle an item lands in; add
+terms when something classifies wrong.
+
+Documented in [`data/shopping-areas.md`](data/shopping-areas.md).
+
+### 2. Which store buys what
+
+`lib/stores/routing.ts` decides whether an item is a weekly or a bulk purchase. By default
+Costco claims raw meat, freezer stock, paper and cleaning goods, and large-format pantry
+staples; everything else goes to Sprouts. Any ingredient can override this with
+`"store": "costco"` or `"store": "sprouts"`.
+
+### 3. Your staples
+
+`STAPLES_CATALOG` in `lib/constants.ts` is the list of things you buy without
+re-deciding, each tagged with its store. Edit it to match your kitchen. The Staples tab on
+the Menu screen manages which ones are on a given week.
+
+### 4. Your week shape and diet
+
+Go to **`/settings`**. Set how many breakfasts, lunches, dinners, and snacks a week
+contains (the default is four dinners and nothing else), plus your calorie window, protein
+and fiber floors, cook-time ceiling, servings per dinner, protein and cuisine rotations,
+and anything you never want to see. Defaults live in `lib/settings.ts`.
+
+These settings drive the plan validator and the planning brief — they are not decoration.
 
 ## Authoring a week
 
-Harvest treats a week as a markdown file with a fenced JSON block (see `data/current-week.md` and `data/mealplans/`).
+Harvest treats a week as a markdown file with a fenced JSON block (see
+[`data/current-week.md`](data/current-week.md) for a complete worked example).
 
 ```bash
-# Optional: refresh markdown from the current JSON seed
-npm run meal-plan:bootstrap-markdown
+# Scaffold a new week
+npm run meal-plan -- new 2026-08-03
 
-# Edit data/current-week.md (keep the JSON fence valid)
-
+# Edit it (keep the JSON fence valid), then:
+npm run meal-plan -- validate data/mealplans/mealplan-week-2026-08-03.md
 npm run meal-plan:sync      # validate + write data/current-week.json
-npm run meal-plan:publish   # upsert into Postgres (dev stack / reachable DB)
+npm run meal-plan:publish   # upsert into Postgres
 ```
+
+Validation checks meal counts against your settings, macro sums, duplicate bases and
+engines, recipe completeness on dinners, junk categories, and shopping classification —
+then prints the derived list grouped by store so you can eyeball the walk order.
 
 ### Planning context (great for AI-assisted weeks)
 
 | File | Role |
 |---|---|
-| [`data/diner-preferences.md`](data/diner-preferences.md) | Primary diner rules (calories, cooking time, proteins, acid-reflux constraints) |
+| [`data/diner-preferences.md`](data/diner-preferences.md) | What a good week looks like beyond the numbers |
 | [`data/companion-preferences.md`](data/companion-preferences.md) | Junk-list categories and rotation rules |
-| [`data/data_context.md`](data/data_context.md) | Trader Joe’s product guidance + quality rules |
+| [`data/data_context.md`](data/data_context.md) | Ingredient guidance, recipe-writing rules, data schema |
 | [`data/meal-plan-skill.md`](data/meal-plan-skill.md) | AI/CLI week-authoring skill + JSON scaffold |
 | [`data/MEAL_PLAN_PRODUCTION_WORKFLOW.md`](data/MEAL_PLAN_PRODUCTION_WORKFLOW.md) | End-to-end publish checklist |
-| [`data/shopping-areas.md`](data/shopping-areas.md) | Store-area hints used when ordering the list |
+| [`data/shopping-areas.md`](data/shopping-areas.md) | Store layouts and routing rules |
+
+Numbers are **not** in these files — they come from `GET /api/settings`.
 
 ## Project layout
 
@@ -153,7 +200,8 @@ npm run meal-plan:publish   # upsert into Postgres (dev stack / reachable DB)
 app/                 Next.js routes + API handlers
 components/          UI (menu cards, shop list, modals, nav)
 lib/                 Domain logic, DB access, hooks, providers
-db/init/             Fresh-install Postgres schema
+lib/stores/          Store layouts, aisle rules, and store routing
+db/init/             Postgres schema and migrations
 data/                Sample week, preferences, planning docs
 scripts/             Seed / sync / publish / validation tools
 docs/                Screenshots and public assets for the README
@@ -167,13 +215,14 @@ docs/                Screenshots and public assets for the README
 | `npm run meal-plan:sync` | Validate markdown → rewrite JSON |
 | `npm run meal-plan:publish` | Publish the synced week to the database |
 | `npm run meal-plan:bootstrap-markdown` | Rebuild `current-week.md` from JSON |
-| `npm run meal-plan` | CLI wrapper (`new` / `validate` / `publish`; scaffolds from `data/meal-plan-skill.md`) |
-| `npm run test:shopping` | Shopping-list order unit checks |
+| `npm run meal-plan` | CLI wrapper (`new` / `validate` / `publish`) |
+| `npm run test:shopping` | Store layout and routing unit checks |
 | `npm run test:meal-plans` | Meal-plan fixture validation |
 | `npm run test:meal-plan-tools` | Run both test suites |
 | `npm run lint` | ESLint |
 
-Host-side DB scripts expect `DATABASE_URL` (see `.env.example`). Use the **dev** Compose file, or point `DATABASE_URL` at a reachable Postgres.
+Host-side DB scripts expect `DATABASE_URL` (see `.env.example`). Use the **dev** Compose
+file, or point `DATABASE_URL` at a reachable Postgres.
 
 ## API overview
 
@@ -185,11 +234,21 @@ Host-side DB scripts expect `DATABASE_URL` (see `.env.example`). Use the **dev**
 | `POST` | `/api/mealplan/ratings` | Heart a meal |
 | `*` | `/api/mealplan/shopping` | Shopping list updates |
 | `*` | `/api/mealplan/junk` | Junk list updates |
-| `*` | `/api/mealplan/household-goods` | Household list updates |
+| `*` | `/api/mealplan/staples` | Staples list updates |
 | `GET`/`POST` | `/api/meals` | Meal library |
 | `PUT` | `/api/meals/[id]` | Update a meal |
+| `GET`/`PUT` | `/api/settings` | Week shape and dietary rules |
 
-**Security:** mutating routes are **unauthenticated**. That is intentional for local household use. Do not expose this stack to the public internet without auth (or network controls) in front of it.
+**Security:** mutating routes are **unauthenticated**. That is intentional for local
+household use. Do not expose this stack to the public internet without auth (or network
+controls) in front of it.
+
+## Upgrading an existing install
+
+`db/init/003_add_recipes_settings_staples.sql` adds the `recipe` column, the
+`app_settings` table, and migrates the old `householdGoods` list into store-tagged
+`staples` (existing entries become Costco items). Fresh installs get all of this from
+`001_init.sql` plus the migration; both are idempotent.
 
 ## Troubleshooting
 
@@ -197,13 +256,16 @@ Host-side DB scripts expect `DATABASE_URL` (see `.env.example`). Use the **dev**
 |---|---|
 | `POSTGRES_PASSWORD` error on `docker compose up` | Copy `.env.example` → `.env` and set a password |
 | App is up but Menu is empty | `curl -X POST http://localhost:3000/api/mealplan/seed` |
-| `npm run seed:meal-plan` can’t connect | Use `docker-compose.dev.yml` (Postgres on `5432`) or fix `DATABASE_URL` |
+| An item shows up in the wrong aisle | Add a keyword rule in `lib/stores/sprouts.ts` or `lib/stores/costco.ts` |
+| An item shows up at the wrong store | Set `"store"` on the ingredient, or edit `lib/stores/routing.ts` |
+| Settings page always shows defaults | Run the `003_` migration so `app_settings` exists |
+| `npm run seed:meal-plan` can't connect | Use `docker-compose.dev.yml` (Postgres on `5432`) or fix `DATABASE_URL` |
 | Stale UI after a rebuild | Hard-refresh; if needed `docker compose down && docker compose up -d --build` |
 | Port 3000 already in use | Stop the other process, or change the host mapping in Compose |
 
 ## Contributing
 
-Issues and PRs are welcome. For behavior changes, keep the week shape (1 breakfast / 1 lunch / 2 dinners) and the shopping-list derivation tests green:
+Issues and PRs welcome. Keep the shopping-derivation and store-routing tests green:
 
 ```bash
 npm run lint

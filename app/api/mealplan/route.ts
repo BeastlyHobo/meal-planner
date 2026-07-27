@@ -14,7 +14,7 @@ export const GET = createRouteHandler(async (request: NextRequest) => {
     listMealPlanWeeks(),
   ]);
 
-  // Reorganize shopping list to match actual Trader Joe's store walking order
+  // Reorganize the shopping list into each store's walking order
   const organizedMealPlan = mealPlan ? {
     ...mealPlan,
     shoppingList: organizeShoppingListForStoreLayout(mealPlan.shoppingList)

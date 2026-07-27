@@ -7,7 +7,7 @@
 
 import { FormEvent, ReactNode, useState } from "react";
 import { X, Loader2, Plus, Trash2 } from "lucide-react";
-import { MealIngredient, MealType, StoredMeal } from "@/lib/types";
+import { MealIngredient, MealType, Recipe, StoredMeal } from "@/lib/types";
 import { MEAL_TYPES } from "@/lib/constants";
 import { cardClass, inputClass, sectionLabelMutedClass } from "@/lib/uiClasses";
 
@@ -38,6 +38,13 @@ type EditorState = {
   c: string;
   f: string;
   fiber: string;
+  servings: string;
+  prepMinutes: string;
+  cookMinutes: string;
+  equipment: string;
+  /** One step per line — the simplest thing that edits well on a phone. */
+  steps: string;
+  notes: string;
 };
 
 type ScalarEditorField = Exclude<keyof EditorState, IngredientCategory>;
@@ -80,6 +87,12 @@ function createEditorState(meal?: StoredMeal, defaultType: MealType = "Dinner"):
       c: "0",
       f: "0",
       fiber: "0",
+      servings: "4",
+      prepMinutes: "0",
+      cookMinutes: "0",
+      equipment: "",
+      steps: "",
+      notes: "",
     };
   }
   return {
@@ -94,6 +107,50 @@ function createEditorState(meal?: StoredMeal, defaultType: MealType = "Dinner"):
     c: String(meal.macros.c),
     f: String(meal.macros.f),
     fiber: String(meal.macros.fiber),
+    servings: String(meal.recipe?.servings ?? 4),
+    prepMinutes: String(meal.recipe?.prepMinutes ?? 0),
+    cookMinutes: String(meal.recipe?.cookMinutes ?? 0),
+    equipment: meal.recipe?.equipment?.join(", ") ?? "",
+    steps: meal.recipe?.steps.join("\n") ?? "",
+    notes: meal.recipe?.notes ?? "",
+  };
+}
+
+/**
+ * Build a recipe from the editor's free-text fields.
+ *
+ * Returns undefined when there are no steps: a meal with only timings and no
+ * instructions is not a recipe, and storing one would render an empty section.
+ */
+function getRecipeForPayload(editorState: EditorState): Recipe | undefined {
+  const steps = editorState.steps
+    .split("\n")
+    .map((step) => step.replace(/^\s*\d+[.)]\s*/, "").trim())
+    .filter(Boolean);
+
+  if (steps.length === 0) {
+    return undefined;
+  }
+
+  const equipment = editorState.equipment
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const toCount = (value: string, fallback: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : fallback;
+  };
+
+  const notes = editorState.notes.trim();
+
+  return {
+    servings: Math.max(1, toCount(editorState.servings, 4)),
+    prepMinutes: toCount(editorState.prepMinutes, 0),
+    cookMinutes: toCount(editorState.cookMinutes, 0),
+    ...(equipment.length ? { equipment } : {}),
+    steps,
+    ...(notes ? { notes } : {}),
   };
 }
 
@@ -235,6 +292,7 @@ export default function MealEditorModal({
         type: editorState.type,
         build,
         ingredients: getIngredientsForPayload(meal, ingredientDrafts),
+        recipe: getRecipeForPayload(editorState) ?? null,
         macros: {
           cal: Number(editorState.cal),
           p: Number(editorState.p),
@@ -347,7 +405,7 @@ export default function MealEditorModal({
             onChange={(index, key, value) => updateIngredientDraft("pro", index, key, value)}
             onAdd={() => addArrayItem("pro")}
             onRemove={(index) => removeArrayItem("pro", index)}
-            namePlaceholder="e.g., Just Chicken"
+            namePlaceholder="e.g., Chicken thighs"
             amountPlaceholder="e.g., 1 pack"
           />
 
@@ -357,7 +415,7 @@ export default function MealEditorModal({
             onChange={(index, key, value) => updateIngredientDraft("base", index, key, value)}
             onAdd={() => addArrayItem("base")}
             onRemove={(index) => removeArrayItem("base", index)}
-            namePlaceholder="e.g., Brown Rice"
+            namePlaceholder="e.g., Jasmine rice"
             amountPlaceholder="e.g., 1/2 cup"
           />
 
@@ -367,7 +425,7 @@ export default function MealEditorModal({
             onChange={(index, key, value) => updateIngredientDraft("veg", index, key, value)}
             onAdd={() => addArrayItem("veg")}
             onRemove={(index) => removeArrayItem("veg", index)}
-            namePlaceholder="e.g., Cruciferous Crunch"
+            namePlaceholder="e.g., Broccoli florets"
             amountPlaceholder="e.g., 1 cup"
           />
 
@@ -377,7 +435,7 @@ export default function MealEditorModal({
             onChange={(index, key, value) => updateIngredientDraft("engine", index, key, value)}
             onAdd={() => addArrayItem("engine")}
             onRemove={(index) => removeArrayItem("engine", index)}
-            namePlaceholder="e.g., Chili Onion Crunch"
+            namePlaceholder="e.g., Gochujang"
             amountPlaceholder="e.g., 2 tbsp"
           />
 
@@ -437,6 +495,93 @@ export default function MealEditorModal({
                 required
               />
             </EditorField>
+          </div>
+
+          <div className={`p-4 ${cardClass}`}>
+            <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.18em] text-harvest-terracotta">
+              Recipe
+            </span>
+            <p className="mb-3 text-xs text-[var(--text-muted)]">
+              Leave the steps empty for an assemble-only meal.
+            </p>
+
+            <div className="grid grid-cols-3 gap-2">
+              <label className="block">
+                <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Serves
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  value={editorState.servings}
+                  onChange={(event) => updateField("servings", event.target.value)}
+                  className={inputClassName}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Prep min
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={editorState.prepMinutes}
+                  onChange={(event) => updateField("prepMinutes", event.target.value)}
+                  className={inputClassName}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Cook min
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={editorState.cookMinutes}
+                  onChange={(event) => updateField("cookMinutes", event.target.value)}
+                  className={inputClassName}
+                />
+              </label>
+            </div>
+
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Equipment (comma separated)
+              </span>
+              <input
+                value={editorState.equipment}
+                onChange={(event) => updateField("equipment", event.target.value)}
+                className={inputClassName}
+                placeholder="Large skillet, sheet pan"
+              />
+            </label>
+
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Steps (one per line)
+              </span>
+              <textarea
+                value={editorState.steps}
+                onChange={(event) => updateField("steps", event.target.value)}
+                className={`${inputClassName} min-h-[9rem] resize-y`}
+                placeholder={"Pat the chicken dry and season.\nSear 4 minutes a side.\nToss with the sauce and serve."}
+              />
+            </label>
+
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Notes
+              </span>
+              <textarea
+                value={editorState.notes}
+                onChange={(event) => updateField("notes", event.target.value)}
+                className={`${inputClassName} min-h-[4rem] resize-y`}
+                placeholder="Keeps 4 days. Double the sauce if you want leftovers saucy."
+              />
+            </label>
           </div>
 
           {message ? <p className="text-sm text-harvest-terracotta">{message}</p> : null}

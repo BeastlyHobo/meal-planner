@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { LayoutDashboard, Search, ShoppingBag } from "lucide-react";
+import { LayoutDashboard, Search, Settings, ShoppingBag } from "lucide-react";
 import WeekSelector from "@/components/WeekSelector";
 import { useMealPlan } from "@/lib/MealPlanProvider";
 import { buildHref } from "@/lib/urlState";
@@ -11,6 +11,7 @@ const navItems = [
   { name: "Menu", href: "/menu", icon: LayoutDashboard },
   { name: "Shop", href: "/shop", icon: ShoppingBag },
   { name: "Explore", href: "/explore", icon: Search },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export default function BottomNav() {
@@ -18,7 +19,7 @@ export default function BottomNav() {
   const searchParams = useSearchParams();
   const { selectedWeekRange, selectWeek, weeks } = useMealPlan();
 
-  const showWeekSelector = pathname !== '/explore';
+  const showWeekSelector = pathname !== '/explore' && pathname !== '/settings';
   const queryString = searchParams.toString();
   const weekRangeFromUrl = searchParams.get("weekRange");
   const effectiveWeekRange = selectedWeekRange ?? weekRangeFromUrl;
@@ -47,7 +48,7 @@ export default function BottomNav() {
                 pathname === "/junk"));
           const Icon = item.icon;
           const href =
-            item.href === "/explore"
+            item.href === "/explore" || item.href === "/settings"
               ? item.href
               : buildHref(item.href, queryString, { weekRange: effectiveWeekRange });
 
@@ -55,7 +56,7 @@ export default function BottomNav() {
             <Link
               key={item.name}
               href={href}
-              className={`flex w-1/3 flex-col items-center gap-1 text-[9px] font-bold uppercase tracking-[0.06em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-0)] rounded-xl py-1 ${
+              className={`flex w-1/4 flex-col items-center gap-1 text-[9px] font-bold uppercase tracking-[0.06em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-0)] rounded-xl py-1 ${
                 isActive ? "text-harvest-green" : "text-[var(--text-muted)]"
               }`}
             >

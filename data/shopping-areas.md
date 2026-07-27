@@ -1,80 +1,129 @@
-# Trader Joe's Home Store Sections & Shopping Flow
+# Store Layouts & Shopping Flow
 
-## A note on layout
+Harvest plans around two stores with different rhythms:
 
-This file documents the home Trader Joe's walk order used by the app. Shopping lists are derived from meal ingredients, then grouped into these sections so the shopper can move through the store once.
+| Store | Cadence | What it covers |
+|---|---|---|
+| **Sprouts** | ~2x/week | Fresh and perishable: produce, deli, cheese, dairy, bread, sauces |
+| **Costco** | ~1x/month | Bulk and freezer stock: raw meat, paper goods, cleaning, large-format pantry |
+
+Shopping lists are **derived**, not hand-authored. Every meal ingredient, junk item, and
+staple is routed to a store and then to an aisle within that store's walking order.
+
+**These layouts are meant to be edited.** They describe one household's stores. Reorder
+the zones in `lib/stores/sprouts.ts` and `lib/stores/costco.ts` to match yours and the
+Shop screen follows immediately.
 
 ---
 
-## Store Sections
+## Sprouts walk order
 
-| Zone | What's Here |
+Produce-first: in through the produce island, around the perimeter for deli/meat/dairy,
+back through the center aisles, then the front-of-store extras.
+
+```
+ 1. Produce — Vegetables
+ 2. Produce — Fruit
+ 3. Fresh Herbs
+ 4. Bulk Bins
+ 5. Bakery & Bread
+ 6. Deli & Prepared
+ 7. Cheese
+ 8. Meat & Seafood
+ 9. Dairy & Eggs
+10. Frozen
+11. Grocery — Pantry
+12. Grocery — Snacks
+13. Grocery — Sweets
+14. Beverages
+15. Beer & Wine
+16. Vitamins & Body Care
+17. Household
+```
+
+| Zone | What lands here |
 |---|---|
-| **Flowers** | Bouquets, flowers, floral items, small plants |
-| **Prepped Salads** | Chopped salad kits and refrigerated prepared salad mixes |
-| **Herbs** | Cilantro, parsley, basil, mint, dill, chives, thyme, rosemary, sage, other fresh herb packs |
-| **Vegetables** | Leafy greens, cucumbers, tomatoes, peppers, zucchini, broccoli, asparagus, kale, cabbage, mushrooms, butternut squash, riced cauliflower, fresh vegetable shortcuts |
-| **Fruit** | Bananas, apples, berries, mango, lemons, limes, avocados, oranges, grapes, pears |
-| **Roots** | Sweet potatoes, potatoes, carrots, beets, onions, shallots, fresh garlic, fresh ginger root |
-| **Beverages** | Sparkling water, seltzer, lemonade, juice, kombucha, sodas, shelf-stable drinks |
-| **Deli Meats & Cheeses** | Deli meats, turkey bacon, smoked salmon, Just Chicken, pulled chicken, grilled chicken strips, chicken sausage, hummus, guacamole, tzatziki, feta, ricotta, string cheese, cream cheese, sliced/shredded cheeses |
-| **Dairy & Eggs** | Eggs, hard-boiled eggs, Greek yogurt, cottage cheese, milk, kefir, sour cream, butter |
-| **Vegan Items** | Refrigerated vegan/plant-based section: tofu, tempeh, plant-based meat-style items, refrigerated vegan dips and dressings |
-| **Pantry Items** | Sauces, condiments, dry grains, oats, pasta, canned beans, canned tomatoes, jarred vegetables, nuts, seeds, nut butters, crackers, crispbread, oils, vinegars, spices, broth, coconut milk, snacks |
-| **Frozen Food** | Frozen proteins, frozen grains, frozen vegetables, frozen complete entrees, turkey meatballs, cauliflower gnocchi, frozen treats |
-| **Sweets** | Candy, chocolate, caramels, cookies, boxed sweets, shelf-stable desserts |
-| **Meats & Seafood** | Fresh chicken, ground turkey, ground beef, fresh salmon fillets, fresh seafood, butcher/fish-counter proteins |
-| **Bread & Tortillas** | Lavash, tortillas, English muffins, sprouted bread, pita, baguette, bagels, crumpets, naan, rolls |
-| **Chips** | Potato chips, tortilla chips, pita chips, rolled corn snacks, plantain chips |
-| **Beer/Wine** | Beer, cider, wine, and other alcohol; last stop in the walk |
+| **Produce — Vegetables** | Greens, lettuce, cabbage, peppers, squash, roots, alliums, mushrooms |
+| **Produce — Fruit** | Berries, bananas, citrus, avocados, stone fruit, melon |
+| **Fresh Herbs** | Cilantro, parsley, dill, basil, mint, rosemary, thyme |
+| **Bulk Bins** | Anything named "bulk", trail mix, dried fruit, loose grains and nuts |
+| **Bakery & Bread** | Sandwich bread, sourdough, tortillas, pita, naan, bagels, buns |
+| **Deli & Prepared** | Sliced deli meats, rotisserie chicken, hummus, guacamole, salad kits |
+| **Cheese** | Block, sliced, and crumbled cheese (not cream cheese or cottage cheese) |
+| **Meat & Seafood** | Fresh-counter proteins bought same-week rather than in bulk |
+| **Dairy & Eggs** | Yogurt, milk, butter, eggs, sour cream, cream cheese, creamers |
+| **Frozen** | Anything frozen, including frozen produce and ice cream |
+| **Grocery — Pantry** | Sauces, condiments, oils, spices, grains, pasta, beans, nut butters. **Fallback zone.** |
+| **Grocery — Snacks** | Chips, crackers, pretzels, popcorn, rice cakes |
+| **Grocery — Sweets** | Brownies, cookies, chocolate, candy, pastries |
+| **Beverages** | Sparkling water, juice, kombucha, coffee, tea |
+| **Beer & Wine** | Beer, wine, cider |
+| **Vitamins & Body Care** | Supplements, sunscreen, shampoo, toothpaste |
+| **Household** | Paper goods and cleaning supplies bought here rather than in bulk |
 
 ---
 
-## Home Store Walk Order
+## Costco walk order
+
+Dry pallets and household goods first, refrigerated and frozen last, so cold items spend
+the least time in the cart.
 
 ```
-1. Flowers
-      ↓
-2. Prepped Salads
-      ↓
-3. Herbs
-      ↓
-4. Vegetables
-      ↓
-5. Fruit
-      ↓
-6. Roots
-      ↓
-7. Beverages
-      ↓
-8. Deli Meats & Cheeses
-      ↓
-9. Dairy & Eggs
-      ↓
-10. Vegan Items
-      ↓
-11. Pantry Items
-      ↓
-12. Frozen Food
-      ↓
-13. Sweets
-      ↓
-14. Meats & Seafood
-      ↓
-15. Bread & Tortillas
-      ↓
-16. Chips
-      ↓
-17. Beer/Wine
+ 1. Bakery
+ 2. Dry Goods & Pantry
+ 3. Snacks & Sweets
+ 4. Beverages
+ 5. Paper & Household
+ 6. Cleaning & Laundry
+ 7. Health & Personal Care
+ 8. Deli & Prepared
+ 9. Meat & Seafood
+10. Dairy & Eggs
+11. Produce
+12. Frozen
 ```
+
+| Zone | What lands here |
+|---|---|
+| **Bakery** | Bread, bagels, croissants, tortillas |
+| **Dry Goods & Pantry** | Oils, rice, pasta, canned goods, broth, nut butters. **Fallback zone.** |
+| **Snacks & Sweets** | Chips, crackers, nuts, bars, candy |
+| **Beverages** | Sparkling water, coffee, juice, electrolytes |
+| **Paper & Household** | Toilet paper, paper towels, trash bags, foil, storage bags, batteries |
+| **Cleaning & Laundry** | Detergent, dish soap, wipes, cleaners |
+| **Health & Personal Care** | Vitamins, OTC medicine, toothpaste, shampoo, razors |
+| **Deli & Prepared** | Rotisserie chicken, sliced deli meat, hummus, prepared kits |
+| **Meat & Seafood** | Raw proteins bought in bulk to portion and freeze |
+| **Dairy & Eggs** | Eggs, milk, butter, yogurt, shredded and block cheese |
+| **Produce** | Bagged greens, berries, bulk vegetables |
+| **Frozen** | Frozen shrimp, salmon, berries, vegetables |
 
 ---
 
-## Practical Notes
+## How an item gets routed
 
-- **Shopping lists are derived**, not hand-authored. The app groups each meal ingredient into the physical section above.
-- **Frozen wins over fresh naming.** Frozen broccoli, frozen salmon, frozen edamame, and frozen grains go to Frozen Food even if their base ingredient sounds like produce, meat, vegan, or pantry.
-- **Vegan Items means the refrigerated vegan area.** Tofu, tempeh, plant-based meat-style items, and refrigerated vegan dips/dressings go there. Beans, lentils, canned chickpeas, frozen edamame, and frozen vegan entrees stay in their normal physical sections.
-- **Dairy & Eggs is separate from Deli Meats & Cheeses.** Yogurt, cottage cheese, eggs, milk, kefir, sour cream, and butter go to Dairy & Eggs; cheeses and deli-style cold-case items go to Deli Meats & Cheeses.
-- **Tomatoes are treated as Vegetables** for shopping behavior. Lemons, limes, and avocados are treated as Fruit.
-- **Pantry Items is the fallback** for unknown shelf-stable or ambiguous items.
+1. **An explicit `store` on the item always wins.** Ingredients in a week's JSON and
+   staples in the catalog can set `"store": "sprouts"` or `"store": "costco"`.
+2. Otherwise the defaults in `lib/stores/routing.ts` apply. Costco claims:
+   - Raw meat and seafood (chicken thighs, ground beef, steak, salmon fillets, shrimp)
+   - Freezer stock (frozen berries, frozen vegetables, frozen shrimp)
+   - Paper, cleaning, and household goods
+   - Large-format pantry staples (olive oil, bulk rice, canned tomatoes, broth)
+3. Everything else goes to Sprouts.
+
+Deli-counter and ready-to-eat versions of the same protein stay on the weekly list:
+"sliced oven-roasted turkey breast" and "rotisserie chicken" go to Sprouts even though
+"chicken thighs" and "ground beef" go to Costco.
+
+### Practical notes
+
+- **Meat on a dinner recipe means "from the freezer."** A dinner that calls for chicken
+  thighs routes them to the Costco list. Check the freezer before the monthly run and
+  mark items **Pantry** on the Costco tab if you are already stocked.
+- **Frozen beats fresh in naming.** "Frozen green beans" goes to Frozen; "green beans"
+  goes to Produce.
+- **Cheese is its own Sprouts zone**, separate from Dairy & Eggs. Cream cheese and
+  cottage cheese are Dairy.
+- **Items named "Leftover ..." are never added to a list.** They are eaten, not bought.
+- **Unrecognized items land in the store's pantry zone** with `fallback` confidence, and
+  `npm run meal-plan -- validate` reports them so you can add a keyword rule.

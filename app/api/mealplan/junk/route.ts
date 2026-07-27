@@ -105,13 +105,13 @@ async function saveJunkList(
     mealPlan.meals,
     mealPlan.shoppingList,
     junkList,
-    mealPlan.householdGoods ?? []
+    mealPlan.staples ?? []
   );
 
   return updateMealPlanLists(mealPlan.id, {
     shoppingList,
     junkList,
-    householdGoods: mealPlan.householdGoods ?? [],
+    staples: mealPlan.staples ?? [],
     source: "user_edit",
     generationContext: {
       updatedFrom,

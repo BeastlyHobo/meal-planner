@@ -11,6 +11,7 @@ import {
   serializePlanData as serializePlanDataFn,
 } from "@/lib/domain/mealMappers";
 import { deriveShoppingListFromMeals } from "@/lib/domain/shoppingListDerivation";
+import { BULK_STORE_KEY } from "@/lib/stores";
 import { normalizeWeekDataBuildArrays } from "@/lib/mealPlanMarkdown";
 import {
   ListCategory,
@@ -23,7 +24,7 @@ import {
   StoredMealPlan,
   WeekData,
   WeekOption,
-  HouseholdGoodsItem,
+  StapleItem,
 } from "@/lib/types";
 import {
   deriveWeekStartDateOnlyFromWeekRange,
@@ -33,6 +34,30 @@ import {
 
 function toNumber(value: number | string): number {
   return typeof value === "number" ? value : Number(value);
+}
+
+/**
+ * Read a plan's staples, upgrading plans written before the two-store split.
+ *
+ * Those plans stored a `householdGoods` array with no store on it; every entry was a
+ * household good, which is a bulk-store purchase, so they migrate to the bulk store.
+ */
+function readStaples(row: MealPlanRow): StapleItem[] {
+  const staples = row.plan_data.staples;
+  if (Array.isArray(staples)) {
+    return staples;
+  }
+
+  const legacyHouseholdGoods = row.plan_data.householdGoods;
+  if (Array.isArray(legacyHouseholdGoods)) {
+    return legacyHouseholdGoods.map((item) => ({
+      category: item.category,
+      n: item.n,
+      store: BULK_STORE_KEY,
+    }));
+  }
+
+  return [];
 }
 
 export async function readSeedWeekData(): Promise<WeekData> {
@@ -45,7 +70,7 @@ export async function readSeedWeekData(): Promise<WeekData> {
       weekData.meals,
       weekData.shoppingList ?? [],
       weekData.junkList,
-      weekData.householdGoods ?? []
+      weekData.staples ?? []
     ),
   };
 }
@@ -142,12 +167,12 @@ async function buildStoredMealPlan(
   const mealPlanId = toNumber(row.id);
   const meals = await getMealPlanMeals(client, mealPlanId);
   const junkList = await enrichJunkList(client, mealPlanId, row.plan_data.junkList ?? []);
-  const householdGoods: HouseholdGoodsItem[] = row.plan_data.householdGoods ?? [];
+  const staples = readStaples(row);
   const shoppingList = deriveShoppingListFromMeals(
     meals,
     row.plan_data.shoppingList ?? [],
     junkList,
-    householdGoods
+    staples
   );
 
   return {
@@ -156,7 +181,7 @@ async function buildStoredMealPlan(
     meals,
     shoppingList,
     junkList,
-    householdGoods,
+    staples,
     source: row.source,
     status: row.status,
     generationContext: row.generation_context ?? {},
@@ -202,7 +227,15 @@ async function findOrCreateMeal(client: PoolClient, meal: MealInput): Promise<nu
 
   if (existing && mealMatchesFn(existing, meal)) {
     const existingId = toNumber(existing.id);
-    if (meal.ingredients && JSON.stringify(existing.ingredients ?? []) !== JSON.stringify(meal.ingredients)) {
+    // Name, build, and macros already match. Ingredients and the recipe are not part of
+    // the signature, so refresh them in place rather than creating a duplicate meal.
+    const ingredientsChanged =
+      Boolean(meal.ingredients) &&
+      JSON.stringify(existing.ingredients ?? []) !== JSON.stringify(meal.ingredients);
+    const recipeChanged =
+      JSON.stringify(existing.recipe ?? null) !== JSON.stringify(meal.recipe ?? null);
+
+    if (ingredientsChanged || recipeChanged) {
       await mealRepo.updateMeal(client, {
         id: existingId,
         ...mealInputToRow(meal),
@@ -268,18 +301,17 @@ export async function upsertMealPlan(
     const normalizedWeekData = normalizeWeekDataBuildArrays(weekData);
     const previousShoppingList =
       existingPlanRow?.plan_data.shoppingList ?? normalizedWeekData.shoppingList ?? [];
-    const householdGoods =
-      existingPlanRow?.plan_data.householdGoods ??
-      normalizedWeekData.householdGoods ??
-      [];
+    const staples = existingPlanRow
+      ? readStaples(existingPlanRow)
+      : normalizedWeekData.staples ?? [];
     const weekDataToStore: WeekData & { shoppingList: ListCategory[] } = {
       ...normalizedWeekData,
-      householdGoods,
+      staples,
       shoppingList: deriveShoppingListFromMeals(
         normalizedWeekData.meals,
         previousShoppingList,
         normalizedWeekData.junkList,
-        householdGoods
+        staples
       ),
     };
 
@@ -380,7 +412,7 @@ export async function updateMealPlanLists(
   input: {
     shoppingList: ListCategory[];
     junkList: ListCategory[];
-    householdGoods: HouseholdGoodsItem[];
+    staples: StapleItem[];
     source?: string;
     generationContext?: Record<string, unknown>;
   }
@@ -390,7 +422,7 @@ export async function updateMealPlanLists(
       mealPlanId,
       shoppingListJson: JSON.stringify(input.shoppingList),
       junkListJson: JSON.stringify(input.junkList),
-      householdGoodsJson: JSON.stringify(input.householdGoods),
+      staplesJson: JSON.stringify(input.staples),
       source: input.source ?? "user_edit",
       generationContextJson: JSON.stringify(input.generationContext ?? {}),
     });
@@ -411,7 +443,7 @@ export async function mutateMealPlanComposition(
     const mealPlanId = toNumber(planRow.id);
     const previousShoppingList = planRow.plan_data.shoppingList ?? [];
     const junkList = planRow.plan_data.junkList ?? [];
-    const householdGoods: HouseholdGoodsItem[] = planRow.plan_data.householdGoods ?? [];
+    const staples = readStaples(planRow);
     const touchedMealIds = new Set<number>();
 
     if (input.action === "add") {
@@ -507,7 +539,7 @@ export async function mutateMealPlanComposition(
       meals,
       previousShoppingList,
       junkList,
-      householdGoods,
+      staples,
       { pruneOrphans }
     );
 
@@ -515,7 +547,7 @@ export async function mutateMealPlanComposition(
       mealPlanId,
       shoppingListJson: JSON.stringify(shoppingList),
       junkListJson: JSON.stringify(junkList),
-      householdGoodsJson: JSON.stringify(householdGoods),
+      staplesJson: JSON.stringify(staples),
       source: "menu_edit",
       generationContextJson: JSON.stringify({
         lastCompositionAction: input.action,

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isStoreKey } from "@/lib/stores";
+import type { StoreKey } from "@/lib/types";
 
 /**
  * Local-first checklist for the in-store shopping run.
@@ -19,13 +21,33 @@ const SHOPPING_ENDPOINT = "/api/mealplan/shopping";
 
 interface SyncOp {
   weekRange: string;
+  store?: StoreKey;
   category: string;
   itemName: string;
   checked: boolean;
 }
 
-function itemKey(category: string, itemName: string) {
-  return `${category}::${itemName}`;
+/**
+ * Aisle names repeat across stores ("Frozen" exists at both), so the store is part of
+ * the checklist key. Neither the store nor the aisle name contains "::", so the first
+ * two separators always split the key correctly.
+ */
+function itemKey(store: StoreKey | undefined, category: string, itemName: string) {
+  return `${store ?? ""}::${category}::${itemName}`;
+}
+
+function parseItemKey(key: string): { store?: StoreKey; category: string; itemName: string } | null {
+  const firstSep = key.indexOf("::");
+  if (firstSep === -1) return null;
+  const secondSep = key.indexOf("::", firstSep + 2);
+  if (secondSep === -1) return null;
+
+  const rawStore = key.slice(0, firstSep);
+  return {
+    store: isStoreKey(rawStore) ? rawStore : undefined,
+    category: key.slice(firstSep + 2, secondSep),
+    itemName: key.slice(secondSep + 2),
+  };
 }
 
 function checklistStorageKey(weekRange: string) {
@@ -130,6 +152,7 @@ export function useOfflineChecklist({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             weekRange: op.weekRange,
+            store: op.store,
             category: op.category,
             itemName: op.itemName,
             checked: op.checked,
@@ -157,6 +180,7 @@ export function useOfflineChecklist({
         (existing) =>
           !(
             existing.weekRange === op.weekRange &&
+            existing.store === op.store &&
             existing.category === op.category &&
             existing.itemName === op.itemName
           )
@@ -205,8 +229,8 @@ export function useOfflineChecklist({
   }, [enabled, flushQueue, refreshPendingCount]);
 
   const toggle = useCallback(
-    (category: string, itemName: string) => {
-      const key = itemKey(category, itemName);
+    (store: StoreKey | undefined, category: string, itemName: string) => {
+      const key = itemKey(store, category, itemName);
       setCheckedKeys((prev) => {
         const next = new Set(prev);
         const nowChecked = !next.has(key);
@@ -218,7 +242,7 @@ export function useOfflineChecklist({
 
         if (enabled) {
           writeChecklist(week, Array.from(next));
-          enqueue({ weekRange: week, category, itemName, checked: nowChecked });
+          enqueue({ weekRange: week, store, category, itemName, checked: nowChecked });
         }
         return next;
       });
@@ -227,7 +251,8 @@ export function useOfflineChecklist({
   );
 
   const isChecked = useCallback(
-    (category: string, itemName: string) => checkedKeys.has(itemKey(category, itemName)),
+    (store: StoreKey | undefined, category: string, itemName: string) =>
+      checkedKeys.has(itemKey(store, category, itemName)),
     [checkedKeys]
   );
 
@@ -235,11 +260,9 @@ export function useOfflineChecklist({
     setCheckedKeys((prev) => {
       if (enabled) {
         for (const key of prev) {
-          const sep = key.indexOf("::");
-          if (sep === -1) continue;
-          const category = key.slice(0, sep);
-          const itemName = key.slice(sep + 2);
-          enqueue({ weekRange: week, category, itemName, checked: false });
+          const parsed = parseItemKey(key);
+          if (!parsed) continue;
+          enqueue({ weekRange: week, ...parsed, checked: false });
         }
         writeChecklist(week, []);
       }

@@ -1,5 +1,6 @@
 import { MealIngredient, MealType, StoredMeal, StoredMealPlan } from "@/lib/types";
-import { stripTraderJoesForDisplay } from "@/lib/displayFormatters";
+import type { StoreKey } from "@/lib/stores/types";
+import { stripStoreBrandForDisplay } from "@/lib/displayFormatters";
 
 export interface ShoppingUsageMeal {
   mealId: number;
@@ -17,12 +18,20 @@ export type ShoppingUsageByKey = Record<string, ShoppingItemUsage>;
 
 const mealTypeOrder: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
-export function getShoppingUsageKey(category: string, itemName: string) {
-  return `${category}::${normalizeShoppingName(itemName)}`;
+/**
+ * Zone names repeat across stores ("Frozen" exists in both), so the store is part of
+ * the key. Callers that have no store (junk lists) can omit it.
+ */
+export function getShoppingUsageKey(
+  category: string,
+  itemName: string,
+  store?: StoreKey
+) {
+  return `${store ?? "any"}::${category}::${normalizeShoppingName(itemName)}`;
 }
 
 export function normalizeShoppingName(name: string) {
-  return stripTraderJoesForDisplay(name)
+  return stripStoreBrandForDisplay(name)
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
@@ -64,7 +73,7 @@ export function getShoppingItemUsage(plan: StoredMealPlan): ShoppingUsageByKey {
   return Object.fromEntries(
     plan.shoppingList.flatMap((category) =>
       category.items.map((item) => [
-        getShoppingUsageKey(category.category, item.n),
+        getShoppingUsageKey(category.category, item.n, item.store ?? category.store),
         getUsageForItem(item.n, meals),
       ])
     )

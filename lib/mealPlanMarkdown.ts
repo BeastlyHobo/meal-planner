@@ -2,6 +2,7 @@ import { writeFile } from "fs/promises";
 import path from "path";
 import { ListCategory, MealInput, WeekData } from "@/lib/types";
 import { deriveShoppingListFromMeals } from "@/lib/domain/shoppingListDerivation";
+import { isStoreKey } from "@/lib/stores";
 
 const MARKDOWN_PATH = path.join(process.cwd(), "data", "current-week.md");
 const JSON_PATH = path.join(process.cwd(), "data", "current-week.json");
@@ -76,6 +77,7 @@ export function normalizeWeekDataBuildArrays(weekData: WeekData): WeekData {
         ...ingredient,
         macros: normalizeMacros(ingredient.macros),
       })),
+      ...(meal.recipe ? { recipe: meal.recipe } : {}),
     })),
   };
 }
@@ -89,7 +91,7 @@ export function normalizeWeekData(weekData: WeekData): NormalizedWeekData {
       normalized.meals,
       normalized.shoppingList ?? [],
       normalized.junkList,
-      normalized.householdGoods ?? []
+      normalized.staples ?? []
     ),
   };
 }
@@ -102,9 +104,10 @@ Use this file as the AI-editable planning brief for the next Harvest week.
 ## Workflow
 1. Update the week summary notes if helpful.
 2. Replace the JSON block with the full new week.
-3. Omit \`shoppingList\` unless you need temporary manual extras; it is derived from meal ingredients.
-4. Run \`npm run meal-plan:sync\` to validate and write \`data/current-week.json\`.
-5. Run \`npm run meal-plan:publish\` to upsert the current week into Postgres.
+3. Give every dinner a \`recipe\` with numbered \`steps\`, \`servings\`, and timing.
+4. Omit \`shoppingList\` unless you need temporary manual extras; it is derived from meal ingredients.
+5. Run \`npm run meal-plan:sync\` to validate and write \`data/current-week.json\`.
+6. Run \`npm run meal-plan:publish\` to upsert the current week into Postgres.
 
 ## Canonical JSON
 \`\`\`json
@@ -129,6 +132,10 @@ function assertWeekData(value: unknown): asserts value is WeekData {
     assertListCategories(value.shoppingList, "shoppingList");
   }
   assertListCategories(value.junkList, "junkList");
+
+  if ("staples" in value && value.staples !== undefined) {
+    assertStaples(value.staples, "staples");
+  }
 }
 
 function assertMeals(value: unknown, field: string): asserts value is MealInput[] {
@@ -180,8 +187,77 @@ function assertMeal(value: unknown, field: string): asserts value is MealInput {
       assertNumber(ingredient.macros.c, `${field}.ingredients[${idx}].macros.c`);
       assertNumber(ingredient.macros.f, `${field}.ingredients[${idx}].macros.f`);
       assertOptionalNumber(ingredient.macros.fiber, `${field}.ingredients[${idx}].macros.fiber`);
+
+      if ("store" in ingredient && ingredient.store !== undefined) {
+        assertStoreKey(ingredient.store, `${field}.ingredients[${idx}].store`);
+      }
     });
   }
+
+  if ("recipe" in value && value.recipe !== undefined && value.recipe !== null) {
+    assertRecipe(value.recipe, `${field}.recipe`);
+  }
+}
+
+function assertRecipe(value: unknown, field: string) {
+  if (!isRecord(value)) {
+    throw new Error(`${field} must be an object.`);
+  }
+
+  assertNumber(value.servings, `${field}.servings`);
+  assertNumber(value.prepMinutes, `${field}.prepMinutes`);
+  assertNumber(value.cookMinutes, `${field}.cookMinutes`);
+
+  if (!Array.isArray(value.steps) || value.steps.length === 0) {
+    throw new Error(`${field}.steps must be a non-empty array.`);
+  }
+
+  value.steps.forEach((step, idx) => {
+    if (typeof step !== "string" || !step.trim()) {
+      throw new Error(`${field}.steps[${idx}] must be a non-empty string.`);
+    }
+  });
+
+  if ("equipment" in value && value.equipment !== undefined) {
+    if (!Array.isArray(value.equipment)) {
+      throw new Error(`${field}.equipment must be an array.`);
+    }
+    value.equipment.forEach((item, idx) => {
+      if (typeof item !== "string" || !item.trim()) {
+        throw new Error(`${field}.equipment[${idx}] must be a non-empty string.`);
+      }
+    });
+  }
+
+  if ("notes" in value && value.notes !== undefined) {
+    assertString(value.notes, `${field}.notes`);
+  }
+}
+
+function assertStoreKey(value: unknown, field: string) {
+  if (!isStoreKey(value)) {
+    throw new Error(`${field} must be a known store key.`);
+  }
+}
+
+function assertStaples(value: unknown, field: string) {
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array.`);
+  }
+
+  value.forEach((staple, idx) => {
+    if (!isRecord(staple)) {
+      throw new Error(`${field}[${idx}] must be an object.`);
+    }
+
+    assertString(staple.category, `${field}[${idx}].category`);
+    assertString(staple.n, `${field}[${idx}].n`);
+    assertStoreKey(staple.store, `${field}[${idx}].store`);
+
+    if ("q" in staple && staple.q !== undefined) {
+      assertString(staple.q, `${field}[${idx}].q`);
+    }
+  });
 }
 
 function assertListCategories(
