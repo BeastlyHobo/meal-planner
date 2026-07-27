@@ -1,14 +1,23 @@
 "use client";
 
 import { ListField, TextAreaField, TextField } from "@/components/settings/Fields";
-import { personDisplayName, type PersonProfile } from "@/lib/settings";
+import {
+  ALLERGY_SUGGESTIONS,
+  CUISINE_SUGGESTIONS,
+  FOOD_SUGGESTIONS,
+  PERSON_GOAL_SUGGESTIONS,
+  personDisplayName,
+  type PersonProfile,
+} from "@/lib/settings";
 import { cardClass } from "@/lib/uiClasses";
 
 /**
  * One person's answers.
  *
- * Everything is free text so nobody is limited to a vocabulary this app picked. The
- * split between "dislikes" and "never eat" is the one distinction worth insisting on:
+ * Every list takes taps or typing: chips cover the foods households usually argue about,
+ * and the text input takes anything they don't, so nobody is limited to a vocabulary this
+ * app picked. The split between "dislikes" and "never eat" is the one distinction worth
+ * insisting on:
  * dislikes shape what gets featured, never-eat is a hard constraint that overrides the
  * other person's preferences.
  */
@@ -47,8 +56,9 @@ export default function PersonStep({
 
         <ListField
           label="Foods you love"
-          hint="Separate with commas. These get featured."
+          hint="Tap the common ones or type your own. These get featured."
           value={person.loves}
+          suggestions={FOOD_SUGGESTIONS}
           placeholder="Salmon, mushrooms, anything spicy, crispy potatoes"
           onChange={(value) => update("loves", value)}
         />
@@ -57,6 +67,7 @@ export default function PersonStep({
           label="Foods you'd rather not"
           hint="You'll eat them, you just don't want them to be the point of dinner."
           value={person.dislikes}
+          suggestions={FOOD_SUGGESTIONS}
           placeholder="Olives, tofu, very sweet sauces"
           onChange={(value) => update("dislikes", value)}
         />
@@ -75,6 +86,7 @@ export default function PersonStep({
           label="Allergies and intolerances"
           hint="Medical. Kept separate so it reads clearly in the plan."
           value={person.allergies}
+          suggestions={ALLERGY_SUGGESTIONS}
           placeholder="Shellfish, tree nuts"
           onChange={(value) => update("allergies", value)}
         />
@@ -83,6 +95,7 @@ export default function PersonStep({
           label="Will not eat"
           hint="Not medical, just never."
           value={person.neverEat}
+          suggestions={FOOD_SUGGESTIONS}
           placeholder="Cilantro, liver, blue cheese"
           onChange={(value) => update("neverEat", value)}
         />
@@ -91,16 +104,18 @@ export default function PersonStep({
       <section className={`space-y-4 p-4 ${cardClass}`}>
         <ListField
           label="Cuisines you want more of"
-          hint="Separate with commas."
+          hint="Tap or type."
           value={person.cuisines}
+          suggestions={CUISINE_SUGGESTIONS}
           placeholder="Thai, Mediterranean, Mexican"
           onChange={(value) => update("cuisines", value)}
         />
 
         <ListField
           label="What you're going for"
-          hint="In your words. Separate with commas."
+          hint="Tap one, or say it in your own words."
           value={person.goals}
+          suggestions={PERSON_GOAL_SUGGESTIONS}
           placeholder="More protein, eat out less, less bloated after dinner"
           onChange={(value) => update("goals", value)}
         />

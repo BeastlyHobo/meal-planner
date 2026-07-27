@@ -162,8 +162,13 @@ the Menu screen manages which ones are on a given week.
 
 Run the questionnaire at **`/onboarding`** — it opens automatically on a fresh install.
 Each person answers separately: foods you love, foods you'd rather not, hard nos,
-allergies, cuisines you want more of, and what you're going for. Every answer is free
-text, so you're not limited to a list someone else wrote.
+allergies, cuisines you want more of, and what you're going for.
+
+Every list takes **taps or typing**. Chips cover the foods households actually argue about
+— mushrooms, cilantro, blue cheese, spicy — and the text box next to them takes anything
+they don't, so you're never limited to a vocabulary someone else picked. Both edit the
+same list: tapping a selected chip removes it, and typing a word that matches a chip
+lights that chip up. Edit the catalogs in `lib/settings/suggestions.ts`.
 
 Then it merges the two profiles and shows you the result before saving:
 
@@ -236,7 +241,7 @@ app/                 Next.js routes + API handlers
 components/          UI (menu cards, shop list, modals, nav)
 lib/                 Domain logic, DB access, hooks, providers
 lib/stores/          Store layouts, aisle rules, and store routing
-lib/settings/        Week shape, dietary targets, people, and goal presets
+lib/settings/        Week shape, dietary targets, people, goal presets, chip catalogs
 db/init/             Postgres schema and migrations
 data/                Sample week, preferences, planning docs
 scripts/             Seed / sync / publish / validation tools

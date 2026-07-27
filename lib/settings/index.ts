@@ -13,6 +13,7 @@ import {
 
 export * from "@/lib/settings/people";
 export * from "@/lib/settings/goals";
+export * from "@/lib/settings/suggestions";
 
 /**
  * Household settings.

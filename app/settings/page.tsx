@@ -6,8 +6,11 @@ import { Check, Loader2, Minus, Plus, RotateCcw, Users } from "lucide-react";
 import { MEAL_TYPES } from "@/lib/constants";
 import { saveSettings, useSettings } from "@/lib/hooks/useSettings";
 import {
+  ALLERGY_SUGGESTIONS,
+  CUISINE_SUGGESTIONS,
   DEFAULT_SETTINGS,
   HouseholdSettings,
+  PROTEIN_SUGGESTIONS,
   MAX_MEALS_PER_TYPE,
   MIN_MEALS_PER_TYPE,
   getReconciledPreferences,
@@ -189,16 +192,18 @@ export default function SettingsPage() {
 
           <ListField
             label="Proteins to rotate"
-            hint="Comma separated. Leave empty for no constraint."
+            hint="Tap or type. Leave empty for no constraint."
             value={draft.dietary.proteins}
+            suggestions={PROTEIN_SUGGESTIONS}
             placeholder="Chicken thighs, Salmon, Beans"
             onChange={(value) => updateDietary("proteins", value)}
           />
 
           <ListField
             label="Cuisines to rotate"
-            hint="Comma separated. Leave empty for no constraint."
+            hint="Tap or type. Leave empty for no constraint."
             value={draft.dietary.cuisines}
+            suggestions={CUISINE_SUGGESTIONS}
             placeholder="Mediterranean, Thai, Tex-Mex"
             onChange={(value) => updateDietary("cuisines", value)}
           />
@@ -207,6 +212,7 @@ export default function SettingsPage() {
             label="Never use"
             hint="Allergies and hard nos. Everyone's questionnaire answers are folded in here automatically — you can add to this list, but removing someone's allergy means editing their profile."
             value={draft.dietary.avoid}
+            suggestions={ALLERGY_SUGGESTIONS}
             placeholder="Cilantro, shellfish"
             onChange={(value) => updateDietary("avoid", value)}
           />

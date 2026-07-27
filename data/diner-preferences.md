@@ -6,7 +6,7 @@
 
 | Surface | What it holds |
 |---|---|
-| **`/onboarding`** | The questionnaire. Each person's likes, dislikes, hard nos, allergies, cuisines, and goals. |
+| **`/onboarding`** | The questionnaire. Each person's likes, dislikes, hard nos, allergies, cuisines, and goals — answered by tapping chips or typing free text, both editing one list. |
 | **`/settings`** | The numbers. Week shape, calorie window, protein and fiber floors, cook-time ceiling, servings per dinner. |
 
 Both write to the same record. Read it — already rendered as a planning brief — with:

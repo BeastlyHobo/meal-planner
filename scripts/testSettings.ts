@@ -1,13 +1,20 @@
 import assert from "node:assert/strict";
 import {
+  ALLERGY_SUGGESTIONS,
   applyGoalPresets,
   createPersonProfile,
+  CUISINE_SUGGESTIONS,
   DEFAULT_SETTINGS,
   describeGoalSuggestions,
   describeSettings,
+  FOOD_SUGGESTIONS,
   GOAL_PRESETS,
+  listIncludes,
   normalizeSettings,
+  PERSON_GOAL_SUGGESTIONS,
+  PROTEIN_SUGGESTIONS,
   reconcilePeople,
+  toggleInList,
   type HouseholdSettings,
   type PersonProfile,
 } from "@/lib/settings";
@@ -195,6 +202,54 @@ assert.equal(
   GOAL_PRESETS.length,
   "goal ids are unique"
 );
+
+// --- Chip suggestions -------------------------------------------------------
+
+// Chips and typed text edit one list, so membership has to ignore capitalization.
+assert.ok(listIncludes(["Mushrooms"], "mushrooms"));
+assert.ok(listIncludes(["  cilantro "], "Cilantro"));
+assert.ok(!listIncludes(["Mushroom"], "Mushrooms"), "no fuzzy matching — singular is a different word");
+assert.ok(!listIncludes([], "Anything"));
+
+// Toggling on appends; toggling off removes regardless of how it was typed.
+assert.deepEqual(toggleInList(["Beef"], "Mushrooms"), ["Beef", "Mushrooms"]);
+assert.deepEqual(toggleInList(["Beef", "Mushrooms"], "Mushrooms"), ["Beef"]);
+assert.deepEqual(
+  toggleInList(["beef", "MUSHROOMS"], "Mushrooms"),
+  ["beef"],
+  "a chip clears a differently-capitalized entry someone typed"
+);
+
+// Order of the untouched entries is preserved, so the text field does not reshuffle
+// under the cursor when a chip is tapped.
+assert.deepEqual(toggleInList(["A", "B", "C"], "B"), ["A", "C"]);
+
+// Every suggestion catalog is non-empty and free of duplicates, since a duplicate would
+// render two chips that fight over the same entry.
+for (const [name, list] of [
+  ["FOOD_SUGGESTIONS", FOOD_SUGGESTIONS],
+  ["ALLERGY_SUGGESTIONS", ALLERGY_SUGGESTIONS],
+  ["CUISINE_SUGGESTIONS", CUISINE_SUGGESTIONS],
+  ["PERSON_GOAL_SUGGESTIONS", PERSON_GOAL_SUGGESTIONS],
+  ["PROTEIN_SUGGESTIONS", PROTEIN_SUGGESTIONS],
+] as const) {
+  assert.ok(list.length > 0, `${name} is empty`);
+  const keys = list.map((entry) => entry.trim().toLowerCase());
+  assert.equal(new Set(keys).size, keys.length, `${name} has a duplicate`);
+  assert.ok(
+    list.every((entry) => entry.trim() === entry && entry.length > 0),
+    `${name} has a blank or untrimmed entry`
+  );
+}
+
+// A chip tapped into a hard-no list must still beat the other person's love.
+const chipDrivenNeverEat = reconcilePeople([
+  person({ id: "a", name: "A", loves: ["Mushrooms"] }),
+  person({ id: "b", name: "B", neverEat: toggleInList([], "Mushrooms") }),
+]);
+assert.deepEqual(chipDrivenNeverEat.neverUse, ["Mushrooms"]);
+assert.deepEqual(chipDrivenNeverEat.everyoneLoves, []);
+assert.deepEqual(chipDrivenNeverEat.contested, []);
 
 // --- Planning brief ---------------------------------------------------------
 
