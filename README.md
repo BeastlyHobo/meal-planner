@@ -23,6 +23,7 @@ never re-decide ride along automatically.
 
 <p align="center">
   <a href="#quick-start"><strong>Quick start</strong></a> ·
+  <a href="#updating">Updating</a> ·
   <a href="#what-you-get">Features</a> ·
   <a href="#making-it-yours">Make it yours</a> ·
   <a href="#authoring-a-week">Author a week</a> ·
@@ -71,66 +72,168 @@ Under the hood: Next.js App Router, React, TypeScript, Tailwind, PostgreSQL, Doc
 
 ## Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose)
-- Node.js 20+ (only needed for host-side scripts and local `npm` workflows)
+**Docker Engine + the Compose plugin, on Linux.** Install from Docker's official
+repository rather than your distro's `docker.io` package — the distro builds are usually
+old and often ship Compose v1:
+
+- [Debian / Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+- [Fedora](https://docs.docker.com/engine/install/fedora/)
+- [Other distros](https://docs.docker.com/engine/install/)
+
+Then add yourself to the `docker` group so you are not typing `sudo` all day:
+
+```bash
+sudo usermod -aG docker "$USER"
+newgrp docker            # or just log out and back in
+docker compose version   # should print v2.x
+```
+
+Node.js 20+ is only needed if you want to author weeks from the command line. Running the
+app needs nothing but Docker.
 
 ## Quick start
 
-### 1. Clone and configure
+The published image carries its own database migrations, so a compose file and a `.env`
+are the whole install. No clone, no build toolchain.
+
+### 1. Make a directory and grab the two files
 
 ```bash
-git clone https://github.com/<you>/meal-planner.git
-cd meal-planner
-cp .env.example .env
+mkdir -p ~/harvest && cd ~/harvest
+
+curl -O https://raw.githubusercontent.com/BeastlyHobo/meal-planner/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/BeastlyHobo/meal-planner/main/.env.example
 ```
 
-Edit `.env` and set a real `POSTGRES_PASSWORD` (the production Compose file will refuse to
-start without it).
-
-### 2. Start the app
+### 2. Set a database password
 
 ```bash
-docker compose up -d --build
+${EDITOR:-nano} .env      # set POSTGRES_PASSWORD to something real
 ```
 
-Open **[http://localhost:3000](http://localhost:3000)** — on a fresh install it opens the
-questionnaire; after that it goes straight to `/menu`.
+Compose refuses to start without it. Nothing else in `.env` needs changing.
 
-Postgres stays on the Docker network (not exposed on the host). The app listens on port
-`3000`.
+### 3. Start it
 
-### 3. Load the sample week
+```bash
+docker compose up -d
+docker compose logs -f app     # ctrl-C once you see the migrations finish
+```
+
+First start pulls the image, waits for Postgres to report healthy, applies the schema, and
+serves. You should see:
+
+```
+[migrate] applying 3 migrations
+[migrate] applied 001_init.sql
+...
+[migrate] done
+```
+
+Open **http://<your-server>:3000** from any device on your network. A fresh install opens
+the questionnaire; after that it goes straight to the menu.
+
+### 4. Load the sample week
 
 ```bash
 curl -X POST http://localhost:3000/api/mealplan/seed
 ```
 
-Or use the **Seed plan** control in the UI when no week is loaded yet.
+Or use the **Seed plan** control in the UI. You should get four dinners with recipes and a
+Shop screen split into Sprouts and Costco tabs.
 
-You should see four dinners with recipes, and a Shop screen with Sprouts and Costco tabs.
+## Updating
+
+```bash
+cd ~/harvest
+docker compose pull
+docker compose up -d
+```
+
+That is the whole update. The app applies any new migrations on start — check
+`docker compose logs app` if you want to watch it happen. Your data lives in a named
+Docker volume and is not touched by a pull.
+
+To pin a specific version instead of tracking `latest`, set `HARVEST_TAG=v1.2.0` in `.env`.
+
+### Back up first
+
+Worth doing before an update, and worth putting in a cron job:
+
+```bash
+docker compose exec -T db pg_dump -U harvest harvest_db | gzip > harvest-$(date +%F).sql.gz
+```
+
+Restore into a fresh stack:
+
+```bash
+gunzip -c harvest-2026-07-27.sql.gz | docker compose exec -T db psql -U harvest -d harvest_db
+```
+
+(Use your own `POSTGRES_USER` / `POSTGRES_DB` if you changed them.)
 
 ### Stop / reset
 
 ```bash
-docker compose down          # stop containers
-docker compose down -v       # also wipe the Postgres volume
+docker compose down          # stop, keep data
+docker compose down -v       # also wipe the database volume
 ```
 
-## Development stack (hot reload)
+## A word on security
+
+**There is no login.** Every mutating API route is open to anything that can reach port
+3000, and `/api/*` responds with `Access-Control-Allow-Origin: *`. That is a deliberate
+trade for a household app on a home network — it means no password to share with your
+spouse and no session to expire while you are standing in an aisle.
+
+It also means: **do not port-forward this, and do not put it on a public IP.** On a normal
+home LAN behind a router it is fine. If you want it reachable from outside the house, put
+it behind a VPN (Tailscale, WireGuard) or a reverse proxy that does the authenticating.
+
+Postgres is not published to the host at all — only the app container can reach it.
+
+## Running from source
+
+Only needed if you are changing the code.
+
+Build and run the production stack from your checkout:
 
 ```bash
-cp .env.example .env   # DATABASE_URL already points at localhost
+git clone https://github.com/BeastlyHobo/meal-planner.git
+cd meal-planner
+cp .env.example .env      # set POSTGRES_PASSWORD
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+### Development stack (hot reload)
+
+```bash
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-Then:
+This one publishes Postgres on `localhost:5432` so host-side scripts can reach it:
 
 ```bash
 npm install
-npm run seed:meal-plan    # host → localhost:5432
+npm run seed:meal-plan
 npm run lint
 npm run test:meal-plan-tools
 ```
+
+### Publishing your own image
+
+`.github/workflows/publish.yml` runs lint, typecheck, and tests, then builds and pushes to
+`ghcr.io/beastlyhobo/meal-planner`. It publishes `latest` from `main`, a `sha-` tag on
+every build, and `vX.Y.Z` + `X.Y` when you push a `v*` git tag. Authentication uses the
+built-in `GITHUB_TOKEN` — there is nothing to configure.
+
+If you fork this, change `IMAGE_NAME` in that workflow and the `image:` line in
+`docker-compose.yml` to your own lowercase `owner/repo`.
+
+> **One-time, after the first successful publish:** a new GHCR package is private by
+> default. Make it public at
+> `github.com/users/<owner>/packages/container/meal-planner/settings` — otherwise your
+> server needs `docker login ghcr.io` before it can pull.
 
 ## Making it yours
 
@@ -242,11 +345,18 @@ components/          UI (menu cards, shop list, modals, nav)
 lib/                 Domain logic, DB access, hooks, providers
 lib/stores/          Store layouts, aisle rules, and store routing
 lib/settings/        Week shape, dietary targets, people, goal presets, chip catalogs
-db/init/             Postgres schema and migrations
+db/init/             Postgres schema and migrations, applied on container start
+scripts/             Seed / sync / publish / validation tools + migrate.mjs
 data/                Sample week, preferences, planning docs
-scripts/             Seed / sync / publish / validation tools
 docs/                Screenshots and public assets for the README
+.github/workflows/   Checks and the GHCR image publish
 ```
+
+| File | When you use it |
+|---|---|
+| `docker-compose.yml` | Normal operation. Pulls the published image. |
+| `docker-compose.build.yml` | Overlay to build from your checkout instead. |
+| `docker-compose.dev.yml` | Hot-reload development. |
 
 ## Scripts
 
@@ -258,6 +368,7 @@ docs/                Screenshots and public assets for the README
 | `npm run meal-plan:bootstrap-markdown` | Rebuild `current-week.md` from JSON |
 | `npm run meal-plan` | CLI wrapper (`new` / `validate` / `publish`) |
 | `npm run settings:brief` | Print the household planning brief |
+| `npm run db:migrate` | Apply pending `db/init/*.sql` (the container does this itself on start) |
 | `npm run test:shopping` | Store layout and routing unit checks |
 | `npm run test:meal-plans` | Meal-plan fixture validation |
 | `npm run test:settings` | Preference reconciliation and goal presets |
@@ -281,31 +392,45 @@ file, or point `DATABASE_URL` at a reachable Postgres.
 | `GET`/`POST` | `/api/meals` | Meal library |
 | `PUT` | `/api/meals/[id]` | Update a meal |
 | `GET`/`PUT` | `/api/settings` | Week shape, dietary rules, people, and the rendered `brief` |
+| `GET` | `/api/health` | Liveness + database reachability (used by the container healthcheck) |
 
-**Security:** mutating routes are **unauthenticated**. That is intentional for local
-household use. Do not expose this stack to the public internet without auth (or network
-controls) in front of it.
+**Security:** see [A word on security](#a-word-on-security). Mutating routes are
+unauthenticated by design; keep this on your LAN.
 
-## Upgrading an existing install
+## How migrations work
 
-`db/init/003_add_recipes_settings_staples.sql` adds the `recipe` column, the
-`app_settings` table, and migrates the old `householdGoods` list into store-tagged
-`staples` (existing entries become Costco items). Fresh installs get all of this from
-`001_init.sql` plus the migration; both are idempotent.
+`scripts/migrate.mjs` runs before the server on every container start. It records applied
+files in a `schema_migrations` table, takes an advisory lock so two containers cannot race,
+and runs each pending file from `db/init/` in its own transaction.
+
+This exists because Postgres only runs `/docker-entrypoint-initdb.d` when its data
+directory is empty — without it, pulling a newer image would leave an existing database on
+the old schema.
+
+Adopting a database that predates this is safe: with no `schema_migrations` table every
+file replays, and every file in `db/init/` is written to be idempotent
+(`CREATE ... IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, guarded `UPDATE`). On a current
+database that is a no-op; on one stuck mid-upgrade it is a repair.
+
+Writing a new one: add `db/init/00N_description.sql`, keep it idempotent, and never edit a
+file that has already shipped — it will not re-run on databases that recorded it.
 
 ## Troubleshooting
 
 | Symptom | Likely fix |
 |---|---|
 | `POSTGRES_PASSWORD` error on `docker compose up` | Copy `.env.example` → `.env` and set a password |
+| `denied` / `unauthorized` on `docker compose pull` | The GHCR package is still private — make it public in the package settings, or `docker login ghcr.io` |
 | App is up but Menu is empty | `curl -X POST http://localhost:3000/api/mealplan/seed` |
+| App container keeps restarting | `docker compose logs app` — a failed migration exits non-zero on purpose rather than serving a half-migrated schema |
+| Can't reach it from your phone | Use the server's LAN IP, not `localhost`, and check the host firewall allows 3000 |
 | An item shows up in the wrong aisle | Add a keyword rule in `lib/stores/sprouts.ts` or `lib/stores/costco.ts` |
 | An item shows up at the wrong store | Set `"store"` on the ingredient, or edit `lib/stores/routing.ts` |
-| Settings page always shows defaults | Run the `003_` migration so `app_settings` exists |
+| Settings page always shows defaults | Migrations have not run — check `docker compose logs app` |
 | The questionnaire keeps reappearing on launch | It only stops once you finish it or hit **Skip for now**; both write `completedOnboardingAt` |
 | Removing an allergy from Settings doesn't stick | By design — edit that person at `/onboarding` |
 | `npm run seed:meal-plan` can't connect | Use `docker-compose.dev.yml` (Postgres on `5432`) or fix `DATABASE_URL` |
-| Stale UI after a rebuild | Hard-refresh; if needed `docker compose down && docker compose up -d --build` |
+| Stale UI after an update | Hard-refresh. The service worker caches the shell; a reload picks up the new one |
 | Port 3000 already in use | Stop the other process, or change the host mapping in Compose |
 
 ## Contributing

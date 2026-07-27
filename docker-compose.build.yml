@@ -1,0 +1,17 @@
+# Build from source instead of pulling the published image.
+#
+# Layer this on top of docker-compose.yml when you have changed the code and want to run
+# your own build:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Everything else — the database, the healthcheck gate, the port — comes from the base
+# file, so the only difference is where the image comes from.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Tag the local build so it never collides with a pulled ghcr.io image.
+    image: harvest-app:local

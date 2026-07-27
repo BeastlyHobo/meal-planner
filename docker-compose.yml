@@ -1,3 +1,14 @@
+# Harvest — run the published image.
+#
+# This file plus a .env is everything you need on the server. No repo checkout, no build
+# toolchain: migrations ship inside the image and run on start.
+#
+#   docker compose up -d                          start
+#   docker compose pull && docker compose up -d   update
+#
+# To build from source instead, add the override:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+
 services:
   db:
     image: postgres:16-alpine
@@ -6,27 +17,38 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-harvest_db}
       POSTGRES_USER: ${POSTGRES_USER:-harvest}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}
-    # In production, you typically do NOT publish Postgres to the host.
-    # If you need host access, publish 5432 in docker-compose.dev.yml instead.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    # Not published to the host. Reach it with `docker compose exec db psql ...`.
+    #
+    # No db/init mount: the app applies migrations itself on every start, which is what
+    # makes pulling a newer image a complete update. Postgres would only run that
+    # directory on a brand-new volume.
     volumes:
       - harvest-postgres-data:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-harvest} -d ${POSTGRES_DB:-harvest_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/beastlyhobo/meal-planner:${HARVEST_TAG:-latest}
     container_name: harvest-app
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        # The app migrates on start, so it must not race Postgres accepting connections.
+        condition: service_healthy
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-harvest}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-harvest_db}}
       HOSTNAME: 0.0.0.0
       PORT: "3000"
+    # Reachable from other devices on your LAN — that is the point, the shopping list gets
+    # used from a phone in the store. There is no login, so do not port-forward this to
+    # the internet.
     ports:
       - "3000:3000"
 
