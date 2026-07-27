@@ -23,7 +23,9 @@ services:
     environment:
       NODE_ENV: development
       NEXT_TELEMETRY_DISABLED: "1"
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-harvest}:${POSTGRES_PASSWORD:-harvest}@db:5432/${POSTGRES_DB:-harvest_db}}
+      # Same reason as docker-compose.yml: .env's DATABASE_URL is for host-side scripts and
+      # points at localhost, which means the container itself.
+      DATABASE_URL: ${HARVEST_DATABASE_URL:-postgresql://${POSTGRES_USER:-harvest}:${POSTGRES_PASSWORD:-harvest}@db:5432/${POSTGRES_DB:-harvest_db}}
     ports:
       - "3000:3000"
     volumes:

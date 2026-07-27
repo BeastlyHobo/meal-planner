@@ -376,7 +376,9 @@ docs/                Screenshots and public assets for the README
 | `npm run lint` | ESLint |
 
 Host-side DB scripts expect `DATABASE_URL` (see `.env.example`). Use the **dev** Compose
-file, or point `DATABASE_URL` at a reachable Postgres.
+file, or point `DATABASE_URL` at a reachable Postgres. That variable is for your machine
+only — the containers always talk to the `db` service and ignore it. To run the app
+against a Postgres you host elsewhere, set `HARVEST_DATABASE_URL` instead.
 
 ## API overview
 

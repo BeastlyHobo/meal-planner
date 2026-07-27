@@ -43,7 +43,11 @@ services:
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-harvest}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-harvest_db}}
+      # Deliberately not ${DATABASE_URL:-...}. Compose interpolates from .env, and .env
+      # carries a DATABASE_URL for host-side scripts pointing at localhost — inside a
+      # container that resolves to the container itself, so the app could never reach
+      # Postgres. HARVEST_DATABASE_URL is the override, and only if you mean it.
+      DATABASE_URL: ${HARVEST_DATABASE_URL:-postgresql://${POSTGRES_USER:-harvest}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-harvest_db}}
       HOSTNAME: 0.0.0.0
       PORT: "3000"
     # Reachable from other devices on your LAN — that is the point, the shopping list gets
