@@ -12,10 +12,10 @@ A week is a flat `meals` array — no days, no timeslots. How many of each meal 
 from **app settings**, not from this document. The default is **4 dinners** (breakfast and
 lunch come off the staples list).
 
-Check the current shape before you author:
+Check the current shape and both people's preferences before you author:
 
 ```bash
-curl -s http://localhost:3000/api/settings | jq .data.settings
+curl -s http://localhost:3000/api/settings | jq -r .data.brief
 ```
 
 Every dinner needs a `recipe`. Fiber is a first-class macro on every ingredient and meal.
@@ -88,7 +88,8 @@ order before you publish. Confirm in the app at http://localhost:3000/menu.
 - [ ] Different protein and cuisine in each dinner
 - [ ] No duplicate `base` or `engine` across the week
 - [ ] Macros and fiber present; ingredient macros sum to meal macros
-- [ ] Nothing on the **never use** list from settings
+- [ ] Nothing on the **never use** list (someone is allergic to or refuses it)
+- [ ] Contested foods are optional in the dish, not cooked through it
 - [ ] Junk list has all seven categories, in order
 - [ ] No shopping-classification fallbacks (or a keyword rule added for each)
 - [ ] Sync and publish succeeded

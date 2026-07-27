@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { ReactNode } from "react";
+import { Users } from "lucide-react";
 import SeedMealPlanButton from "@/components/SeedMealPlanButton";
 import { StoredMealPlan } from "@/lib/types";
 
@@ -31,8 +33,15 @@ export default function MealPlanGate({
 
   if (!plan) {
     return (
-      <main className="px-4">
+      <main className="px-4 space-y-3">
         <SeedMealPlanButton onSeeded={onSeeded} />
+        <Link
+          href="/onboarding"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-1)] px-4 py-3 text-sm font-semibold text-harvest-green"
+        >
+          <Users size={15} />
+          Set up your preferences
+        </Link>
       </main>
     );
   }

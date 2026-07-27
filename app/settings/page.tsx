@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { Check, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
+import { Check, Loader2, Minus, Plus, RotateCcw, Users } from "lucide-react";
 import { MEAL_TYPES } from "@/lib/constants";
 import { saveSettings, useSettings } from "@/lib/hooks/useSettings";
 import {
@@ -9,22 +10,14 @@ import {
   HouseholdSettings,
   MAX_MEALS_PER_TYPE,
   MIN_MEALS_PER_TYPE,
+  getReconciledPreferences,
+  personDisplayName,
+  personHasAnswers,
   totalMealsForWeekShape,
 } from "@/lib/settings";
 import type { MealType } from "@/lib/types";
-import { cardClass, inputClass, sectionLabelColorClass } from "@/lib/uiClasses";
-
-/** Comma-separated in the UI, string[] in the model. */
-function toList(value: string): string[] {
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-    )
-  );
-}
+import { ListField, NumberField, TextAreaField } from "@/components/settings/Fields";
+import { cardClass, sectionLabelColorClass } from "@/lib/uiClasses";
 
 export default function SettingsPage() {
   const { settings, isLoading, refresh } = useSettings();
@@ -94,6 +87,8 @@ export default function SettingsPage() {
       {isLoading ? (
         <p className="text-sm text-[var(--text-muted)]">Loading settings...</p>
       ) : null}
+
+      <WhoIsEatingCard settings={draft} />
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <section className={`p-4 ${cardClass}`}>
@@ -187,7 +182,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className={`p-4 ${cardClass}`}>
+        <section className={`space-y-4 p-4 ${cardClass}`}>
           <h2 className="text-[10px] font-black uppercase tracking-[0.18em] text-harvest-terracotta">
             Diet
           </h2>
@@ -210,23 +205,19 @@ export default function SettingsPage() {
 
           <ListField
             label="Never use"
-            hint="Allergies and hard nos. Comma separated."
+            hint="Allergies and hard nos. Everyone's questionnaire answers are folded in here automatically — you can add to this list, but removing someone's allergy means editing their profile."
             value={draft.dietary.avoid}
             placeholder="Cilantro, shellfish"
             onChange={(value) => updateDietary("avoid", value)}
           />
 
-          <label className="mt-4 block">
-            <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
-              Notes
-            </span>
-            <textarea
-              value={draft.dietary.notes}
-              onChange={(event) => updateDietary("notes", event.target.value)}
-              className={`${inputClass} min-h-[6rem] resize-y`}
-              placeholder="Anything the fields above don't cover — reflux triggers, textures one of you won't eat, how spicy is too spicy."
-            />
-          </label>
+          <TextAreaField
+            label="Notes"
+            value={draft.dietary.notes}
+            rows={5}
+            onChange={(value) => updateDietary("notes", value)}
+            placeholder="Anything the fields above don't cover — reflux triggers, textures one of you won't eat, how spicy is too spicy."
+          />
         </section>
 
         {error ? (
@@ -272,72 +263,63 @@ export default function SettingsPage() {
   );
 }
 
-function NumberField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
-        {label}
-      </span>
-      <input
-        type="number"
-        inputMode="numeric"
-        min="0"
-        value={value}
-        onChange={(event) => {
-          const parsed = Number(event.target.value);
-          onChange(Number.isFinite(parsed) ? parsed : 0);
-        }}
-        className={inputClass}
-      />
-    </label>
-  );
-}
-
-function ListField({
-  label,
-  hint,
-  value,
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: string[];
-  placeholder: string;
-  onChange: (value: string[]) => void;
-}) {
-  // Keep the raw text local so typing a comma or a trailing space isn't eaten by
-  // round-tripping through the array on every keystroke. Re-sync only when the
-  // underlying list identity actually changes (a save, or a reset to defaults).
-  const [text, setText] = useState(() => value.join(", "));
-  const [syncedValue, setSyncedValue] = useState(value);
-
-  if (syncedValue !== value) {
-    setSyncedValue(value);
-    setText(value.join(", "));
-  }
+/**
+ * Taste lives in the questionnaire, not here. This card shows what it captured and sends
+ * you back to edit it, so the numbers page never becomes a second place to record likes.
+ */
+function WhoIsEatingCard({ settings }: { settings: HouseholdSettings }) {
+  const answering = settings.people.filter(personHasAnswers);
+  const reconciled = getReconciledPreferences(settings);
 
   return (
-    <label className="mt-4 block">
-      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">
-        {label}
-      </span>
-      <input
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onBlur={() => onChange(toList(text))}
-        className={inputClass}
-        placeholder={placeholder}
-      />
-      <span className="mt-1 block text-[11px] text-[var(--text-muted)]">{hint}</span>
-    </label>
+    <section className={`mb-4 p-4 ${cardClass}`}>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-[10px] font-black uppercase tracking-[0.18em] text-harvest-terracotta">
+          Who&apos;s eating
+        </h2>
+        <Link
+          href="/onboarding"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-harvest-green/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-harvest-green"
+        >
+          <Users size={12} />
+          {answering.length > 0 ? "Edit" : "Set up"}
+        </Link>
+      </div>
+
+      {answering.length === 0 ? (
+        <p className="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">
+          Nobody has filled out the questionnaire yet. It captures each person&apos;s likes,
+          dislikes, allergies, and goals, then turns them into the rules below.
+        </p>
+      ) : (
+        <>
+          <ul className="mt-3 space-y-2">
+            {settings.people.map((person, index) => (
+              <li key={person.id} className="text-sm">
+                <span className="font-semibold text-[var(--foreground)]">
+                  {personDisplayName(person, index)}
+                </span>
+                <span className="text-[var(--text-muted)]">
+                  {person.loves.length ? ` · loves ${person.loves.slice(0, 3).join(", ")}` : ""}
+                  {person.allergies.length
+                    ? ` · allergic to ${person.allergies.join(", ")}`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {reconciled.contested.length > 0 ? (
+            <p className="mt-3 text-xs leading-relaxed text-[var(--text-muted)]">
+              Split opinion on{" "}
+              <span className="font-semibold text-[var(--foreground)]">
+                {reconciled.contested.join(", ")}
+              </span>{" "}
+              — planned occasionally, or made easy to leave out.
+            </p>
+          ) : null}
+        </>
+      )}
+    </section>
   );
 }

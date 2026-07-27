@@ -14,9 +14,11 @@
     "meal-plan:publish": "tsx scripts/publishMealPlan.ts",
     "meal-plan:workflow": "tsx scripts/publishFromBackup.ts",
     "meal-plan": "tsx scripts/mealPlanSkill.ts",
+    "settings:brief": "tsx scripts/printSettingsBrief.ts",
     "test:shopping": "tsx scripts/testShoppingListOrder.ts",
     "test:meal-plans": "tsx scripts/testMealPlanFixtures.ts",
-    "test:meal-plan-tools": "npm run test:shopping && npm run test:meal-plans"
+    "test:meal-plan-tools": "npm run test:shopping && npm run test:meal-plans && npm run test:settings",
+    "test:settings": "tsx scripts/testSettings.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

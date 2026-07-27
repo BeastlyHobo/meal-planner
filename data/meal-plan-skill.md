@@ -12,7 +12,15 @@ You are operating the Harvest meal planning engine for a two-store household:
 Sprouts about twice a week, Costco about once a month.
 
 ✅ SETTINGS ARE THE SOURCE OF TRUTH (read them every session):
-- GET /api/settings returns weekShape and dietary rules. Defaults are in lib/settings.ts.
+- GET /api/settings returns weekShape, dietary rules, per-person profiles, and a `brief`
+  field that renders all of it as prose. Defaults are in lib/settings/index.ts.
+- The household is TWO PEOPLE with separate profiles from the /onboarding questionnaire.
+  The brief tells you what each loves, dislikes, and cannot eat, plus the reconciliation:
+    * Never use  -> someone is allergic or refuses. NEVER plan these. No exceptions.
+    * Everyone loves -> feature often.
+    * One of them loves -> rotate in, not every week.
+    * Split -> one loves, one dislikes. Occasional, and built so it is easy to leave out
+      (a topping or a side, not cooked through the whole dish).
 - weekShape decides how many of each meal type the week contains. Do NOT assume a shape.
 - Default shape is 4 dinners and nothing else; breakfast and lunch come off the staples list.
 - dietary carries: calorie window, protein floor, fiber floor, max cook minutes,
@@ -89,7 +97,8 @@ Sprouts about twice a week, Costco about once a month.
 
 | Role | Source |
 |---|---|
-| Week shape and dietary rules | `GET /api/settings` (edited at `/settings`) |
+| Week shape and dietary rules | `GET /api/settings` (numbers edited at `/settings`) |
+| Per-person likes, dislikes, allergies, goals | `GET /api/settings` -> `people` and `brief` (edited at `/onboarding`) |
 | How a good week is shaped | `data/diner-preferences.md` |
 | Junk list | `data/companion-preferences.md` |
 | Ingredient and product guidance | `data/data_context.md` |

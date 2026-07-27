@@ -42,6 +42,9 @@ Most meal apps optimize for recipes. Harvest optimizes for **how you actually sh
   are configured once and appear on every list.
 - **Dinners with recipes.** Numbered steps, prep and cook time, servings, and equipment —
   on the meal card and the detail page.
+- **A questionnaire you both fill out.** Separate profiles for each of you — likes,
+  dislikes, allergies, goals — merged into rules the planner follows. If one of you can't
+  eat something, it never gets planned.
 - **A flat menu, no day grid.** Four dinners a week; you decide on Tuesday what Tuesday is.
 - **Macros that matter in practice** — calories, protein, carbs, fat, and fiber.
 - **Your rules, in the app.** Week shape and dietary targets live at `/settings`, not in
@@ -60,7 +63,8 @@ validate it, and publish it into the live app.
 | **Menu** (`/menu`) | The week's meals by type, plus Junk and Staples tabs |
 | **Shop** (`/shop`) | Derived shopping list, split into Sprouts and Costco tabs in store walking order |
 | **Explore** (`/explore`) | Searchable meal library with hearts and history |
-| **Settings** (`/settings`) | Week shape and dietary rules |
+| **Questionnaire** (`/onboarding`) | Each person's likes, dislikes, allergies, and goals |
+| **Settings** (`/settings`) | Week shape and dietary targets |
 | **Offline-friendly** | Service worker keeps the current week usable in-store |
 
 Under the hood: Next.js App Router, React, TypeScript, Tailwind, PostgreSQL, Docker.
@@ -89,7 +93,8 @@ start without it).
 docker compose up -d --build
 ```
 
-Open **[http://localhost:3000](http://localhost:3000)** — it redirects to `/menu`.
+Open **[http://localhost:3000](http://localhost:3000)** — on a fresh install it opens the
+questionnaire; after that it goes straight to `/menu`.
 
 Postgres stays on the Docker network (not exposed on the host). The app listens on port
 `3000`.
@@ -153,14 +158,35 @@ staples; everything else goes to Sprouts. Any ingredient can override this with
 re-deciding, each tagged with its store. Edit it to match your kitchen. The Staples tab on
 the Menu screen manages which ones are on a given week.
 
-### 4. Your week shape and diet
+### 4. Your tastes
+
+Run the questionnaire at **`/onboarding`** — it opens automatically on a fresh install.
+Each person answers separately: foods you love, foods you'd rather not, hard nos,
+allergies, cuisines you want more of, and what you're going for. Every answer is free
+text, so you're not limited to a list someone else wrote.
+
+Then it merges the two profiles and shows you the result before saving:
+
+| Bucket | What it means |
+|---|---|
+| **Never used** | One of you is allergic to it or refuses it. Never planned, no exceptions — and it's dropped from the other person's "loves" too. |
+| **You both love** | Featured often. |
+| **One of you loves** | Rotated in rather than every week. |
+| **You disagree** | Planned occasionally, and built so it's easy to leave out. |
+
+Picking a goal ("more protein", "stop eating out") shows you the concrete target change —
+*Protein floor 30g → 40g* — behind an Apply button. Nothing changes silently.
+
+### 5. Your week shape and targets
 
 Go to **`/settings`**. Set how many breakfasts, lunches, dinners, and snacks a week
 contains (the default is four dinners and nothing else), plus your calorie window, protein
-and fiber floors, cook-time ceiling, servings per dinner, protein and cuisine rotations,
-and anything you never want to see. Defaults live in `lib/settings.ts`.
+and fiber floors, cook-time ceiling, and servings per dinner. Defaults live in
+`lib/settings/index.ts`.
 
-These settings drive the plan validator and the planning brief — they are not decoration.
+These drive the plan validator and the planning brief — they are not decoration. The
+questionnaire's hard nos land in the **Never use** list here, which is additive: you can
+add to it, but removing someone's allergy means editing their profile, not this field.
 
 ## Authoring a week
 
@@ -192,7 +218,16 @@ then prints the derived list grouped by store so you can eyeball the walk order.
 | [`data/MEAL_PLAN_PRODUCTION_WORKFLOW.md`](data/MEAL_PLAN_PRODUCTION_WORKFLOW.md) | End-to-end publish checklist |
 | [`data/shopping-areas.md`](data/shopping-areas.md) | Store layouts and routing rules |
 
-Numbers are **not** in these files — they come from `GET /api/settings`.
+Preferences are **not** in these files — they come from `GET /api/settings`, whose
+`brief` field renders both people's profiles and the reconciliation as prose:
+
+```bash
+curl -s http://localhost:3000/api/settings | jq -r .data.brief
+npm run settings:brief   # same thing from a terminal, needs DATABASE_URL
+```
+
+With a reachable database, `npm run meal-plan -- validate` checks a week against those
+live preferences — so a dinner containing something one of you can't eat gets flagged.
 
 ## Project layout
 
@@ -201,6 +236,7 @@ app/                 Next.js routes + API handlers
 components/          UI (menu cards, shop list, modals, nav)
 lib/                 Domain logic, DB access, hooks, providers
 lib/stores/          Store layouts, aisle rules, and store routing
+lib/settings/        Week shape, dietary targets, people, and goal presets
 db/init/             Postgres schema and migrations
 data/                Sample week, preferences, planning docs
 scripts/             Seed / sync / publish / validation tools
@@ -216,9 +252,11 @@ docs/                Screenshots and public assets for the README
 | `npm run meal-plan:publish` | Publish the synced week to the database |
 | `npm run meal-plan:bootstrap-markdown` | Rebuild `current-week.md` from JSON |
 | `npm run meal-plan` | CLI wrapper (`new` / `validate` / `publish`) |
+| `npm run settings:brief` | Print the household planning brief |
 | `npm run test:shopping` | Store layout and routing unit checks |
 | `npm run test:meal-plans` | Meal-plan fixture validation |
-| `npm run test:meal-plan-tools` | Run both test suites |
+| `npm run test:settings` | Preference reconciliation and goal presets |
+| `npm run test:meal-plan-tools` | Run all three test suites |
 | `npm run lint` | ESLint |
 
 Host-side DB scripts expect `DATABASE_URL` (see `.env.example`). Use the **dev** Compose
@@ -237,7 +275,7 @@ file, or point `DATABASE_URL` at a reachable Postgres.
 | `*` | `/api/mealplan/staples` | Staples list updates |
 | `GET`/`POST` | `/api/meals` | Meal library |
 | `PUT` | `/api/meals/[id]` | Update a meal |
-| `GET`/`PUT` | `/api/settings` | Week shape and dietary rules |
+| `GET`/`PUT` | `/api/settings` | Week shape, dietary rules, people, and the rendered `brief` |
 
 **Security:** mutating routes are **unauthenticated**. That is intentional for local
 household use. Do not expose this stack to the public internet without auth (or network
@@ -259,6 +297,8 @@ controls) in front of it.
 | An item shows up in the wrong aisle | Add a keyword rule in `lib/stores/sprouts.ts` or `lib/stores/costco.ts` |
 | An item shows up at the wrong store | Set `"store"` on the ingredient, or edit `lib/stores/routing.ts` |
 | Settings page always shows defaults | Run the `003_` migration so `app_settings` exists |
+| The questionnaire keeps reappearing on launch | It only stops once you finish it or hit **Skip for now**; both write `completedOnboardingAt` |
+| Removing an allergy from Settings doesn't stick | By design — edit that person at `/onboarding` |
 | `npm run seed:meal-plan` can't connect | Use `docker-compose.dev.yml` (Postgres on `5432`) or fix `DATABASE_URL` |
 | Stale UI after a rebuild | Hard-refresh; if needed `docker compose down && docker compose up -d --build` |
 | Port 3000 already in use | Stop the other process, or change the host mapping in Compose |

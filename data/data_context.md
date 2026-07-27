@@ -8,7 +8,7 @@ accurate, and genuinely good food.
 
 | Source | What it gives you |
 |---|---|
-| `GET /api/settings` | Week shape and dietary rules. **Authoritative** — never assume. |
+| `GET /api/settings` | Week shape, dietary rules, and per-person profiles. **Authoritative** — never assume. The response's `brief` field is this already rendered as prose. |
 | `data/diner-preferences.md` | What a good week looks like beyond the numbers |
 | `data/companion-preferences.md` | Junk list rules |
 | `data/shopping-areas.md` | Store layouts and how items route between stores |
@@ -18,7 +18,19 @@ accurate, and genuinely good food.
 
 ## The household
 
-Two adults. They shop **Sprouts about twice a week** and **Costco about once a month**.
+Two adults, each with their own profile from the questionnaire at `/onboarding`. Read
+`brief` from `/api/settings` — it names both people, what each loves and won't eat, and
+how those combine.
+
+**The reconciliation rules you must respect:**
+
+- **Never use** — someone is allergic to or refuses these. No exceptions, ever.
+- **Everyone loves** — feature these often.
+- **One of them loves** — rotate in, not every week.
+- **Split** — one loves it, the other doesn't. Plan occasionally, and build the dish so
+  the contested item is a topping or a side rather than cooked through everything.
+
+They shop **Sprouts about twice a week** and **Costco about once a month**.
 
 Breakfast and lunch are not planned — they are the same every week and live on the
 recurring **staples list**: sandwich turkey, cheese, bread, lettuce, greens, tomatoes,
@@ -189,7 +201,8 @@ order.
 
 ## Generation pipeline
 
-1. **Read settings.** Week shape and dietary rules. Never assume the shape.
+1. **Read settings.** `GET /api/settings` — week shape, dietary rules, and both people's
+   profiles. Never assume the shape, and never plan something on the never-use list.
 2. **Check the library.** `GET /api/meals` — avoid repeating the last two weeks. Hearted
    meals may return sooner.
 3. **Check the freezer.** Build around proteins from the last Costco run.

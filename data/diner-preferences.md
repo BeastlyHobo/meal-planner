@@ -2,18 +2,40 @@
 
 > Referenced by: `data/data_context.md`, `data/meal-plan-skill.md`, `data/MEAL_PLAN_PRODUCTION_WORKFLOW.md`
 
-**The numbers live in the app, not in this file.** Week shape, calorie window, protein and
-fiber floors, cook-time ceiling, servings per dinner, protein rotation, cuisine rotation,
-and the never-use list are all edited at **`/settings`** and stored in the database.
+**Preferences live in the app, not in this file.**
 
-Read them with:
+| Surface | What it holds |
+|---|---|
+| **`/onboarding`** | The questionnaire. Each person's likes, dislikes, hard nos, allergies, cuisines, and goals. |
+| **`/settings`** | The numbers. Week shape, calorie window, protein and fiber floors, cook-time ceiling, servings per dinner. |
+
+Both write to the same record. Read it — already rendered as a planning brief — with:
 
 ```bash
-curl -s http://localhost:3000/api/settings | jq .data.settings
+curl -s http://localhost:3000/api/settings | jq -r .data.brief
 ```
 
-The defaults are in `lib/settings.ts` (`DEFAULT_SETTINGS`). `describeSettings()` renders
-them as a plain-text brief you can paste into a planning session.
+Or from a terminal with `DATABASE_URL` set:
+
+```bash
+npm run settings:brief
+```
+
+The defaults are in `lib/settings/index.ts` (`DEFAULT_SETTINGS`).
+
+### How two people become one set of rules
+
+`reconcilePeople()` in `lib/settings/people.ts` merges the profiles:
+
+- **Hard nos are a union, never an intersection.** If either person is allergic to or
+  refuses something, it is never planned — and it is removed from the other person's
+  "loves" list too. This is the one rule with no exceptions.
+- **Everyone loves** → feature often.
+- **One of them loves**, nobody dislikes → rotate in.
+- **Split** (one loves, one dislikes) → occasional, and served so it is easy to leave out.
+
+The reconciled hard nos are folded into `dietary.avoid`, which the plan validator already
+checks, so the questionnaire genuinely gates a week rather than just describing it.
 
 This file holds the things that are not numbers — the shape of a good week and the
 judgment calls the settings cannot express.

@@ -17,6 +17,8 @@ import {
   printMealPlanValidationResult,
   validateMealPlanFile,
 } from "./mealPlanValidation";
+import { DEFAULT_SETTINGS, type HouseholdSettings } from "@/lib/settings";
+import { getHouseholdSettings } from "@/lib/services/settingsService";
 
 const MEALPLANS_DIR = path.join(process.cwd(), 'data', 'mealplans');
 const CURRENT_WEEK_FILE = path.join(process.cwd(), 'data', 'current-week.md');
@@ -80,19 +82,35 @@ ${jsonSection.replace('[start] — [end]', `${startDate.toLocaleDateString('en-U
   return filepath;
 }
 
-function validatePlan(filepath?: string) {
+/**
+ * Validate against the household's live settings when a database is reachable, so the
+ * questionnaire's hard nos and targets actually gate a week. Falls back to the defaults
+ * so validation still runs with no DB (CI, a fresh clone, offline authoring).
+ */
+async function loadSettingsForValidation(): Promise<HouseholdSettings> {
+  if (!process.env.DATABASE_URL) {
+    return DEFAULT_SETTINGS;
+  }
+  return getHouseholdSettings();
+}
+
+async function validatePlan(filepath?: string) {
   const targetFile = filepath ?? CURRENT_WEEK_FILE;
   console.log(`🔍 Validating: ${targetFile}`);
 
-  const result = validateMealPlanFile(targetFile, { printShoppingOrder: true });
+  const settings = await loadSettingsForValidation();
+  const result = validateMealPlanFile(targetFile, {
+    printShoppingOrder: true,
+    settings,
+  });
   printMealPlanValidationResult(result);
   return result.valid;
 }
 
-function publishPlan(filepath?: string) {
+async function publishPlan(filepath?: string) {
   const targetFile = filepath ?? CURRENT_WEEK_FILE;
 
-  if (!validatePlan(targetFile)) {
+  if (!(await validatePlan(targetFile))) {
     console.log('❌ Cannot publish invalid plan');
     process.exit(1);
   }
@@ -108,25 +126,40 @@ function publishPlan(filepath?: string) {
 }
 
 // Main
-const args = process.argv.slice(2);
-const command = args[0];
+async function main() {
+  const args = process.argv.slice(2);
+  const command = args[0];
 
-switch (command) {
-  case 'new':
-    createNewPlan(getMondayDate(args[1]));
-    break;
-  case 'validate':
-    validatePlan(args[1]);
-    break;
-  case 'publish':
-    publishPlan(args[1]);
-    break;
-  case 'generate':
-    console.log('🧠 Generating full meal plan...');
-    const newPath = createNewPlan(getMondayDate());
-    console.log(`📝 Edit plan at: ${newPath}`);
-    console.log('💡 Once complete run: npm run meal-plan validate && npm run meal-plan publish');
-    break;
-  default:
-    showHelp();
+  switch (command) {
+    case 'new':
+      createNewPlan(getMondayDate(args[1]));
+      break;
+    case 'validate': {
+      const valid = await validatePlan(args[1]);
+      if (!valid) {
+        process.exitCode = 1;
+      }
+      break;
+    }
+    case 'publish':
+      await publishPlan(args[1]);
+      break;
+    case 'generate': {
+      console.log('🧠 Generating full meal plan...');
+      const newPath = createNewPlan(getMondayDate());
+      console.log(`📝 Edit plan at: ${newPath}`);
+      console.log('💡 Once complete run: npm run meal-plan validate && npm run meal-plan publish');
+      break;
+    }
+    default:
+      showHelp();
+  }
 }
+
+main().then(
+  () => process.exit(process.exitCode ?? 0),
+  (error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+);

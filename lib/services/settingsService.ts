@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { pool } from "@/lib/db";
 import {
   DEFAULT_SETTINGS,
@@ -19,9 +20,12 @@ interface AppSettingsRow {
  * erroring. That keeps the app usable before migrations have been run.
  */
 export async function getHouseholdSettings(): Promise<HouseholdSettings> {
-  const client = await pool.connect();
+  // pool.connect() is inside the try on purpose: an unreachable database throws here,
+  // not at query time, and this function promises callers it always returns settings.
+  let client: PoolClient | undefined;
 
   try {
+    client = await pool.connect();
     const result = await client.query<AppSettingsRow>(
       `SELECT key, value FROM app_settings WHERE key = $1 LIMIT 1`,
       [SETTINGS_KEY]
@@ -32,7 +36,7 @@ export async function getHouseholdSettings(): Promise<HouseholdSettings> {
   } catch {
     return DEFAULT_SETTINGS;
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
